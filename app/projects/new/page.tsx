@@ -1,9 +1,42 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 import { VenueRuleSelector } from "@/components/venue-rule-selector";
+
+type AiAnalysisResult = {
+  thinking: {
+    thoughts: string;
+    prompt: string;
+    reasoning: string;
+    confidence: number;
+  };
+  content: {
+    content: string;
+    sections: Record<string, string>;
+    metadata: {
+      wordCount: number;
+      estimatedReadingTime: number;
+      topics: string[];
+    };
+  };
+  quality: {
+    overallScore: number;
+    criteria: Array<{
+      name: string;
+      score: number;
+      feedback: string;
+    }>;
+    suggestions: string[];
+    approved: boolean;
+  };
+  nextSteps: Array<{
+    step: string;
+    preview: string;
+    estimatedTime: number;
+  }>;
+};
 
 export default function NewProjectPage() {
   const [title, setTitle] = useState("非遗纹样驱动的智能服饰交互设计研究");
@@ -12,7 +45,52 @@ export default function NewProjectPage() {
   const [description, setDescription] = useState("我想研究传统纹样如何进入智能服饰场景，并通过小规模用户测试验证文化识别度和交互体验。");
   const [venueId, setVenueId] = useState("ieee-iccci-2026");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState("");
+  const [aiAnalysis, setAiAnalysis] = useState<AiAnalysisResult | null>(null);
+
+  async function analyzeWithAi() {
+    setIsAnalyzing(true);
+    setError("");
+
+    try {
+      const response = await fetch("/api/ai/think", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          taskType: "project_initialization",
+          context: {
+            projectId: "new",
+            projectTitle: title,
+            venueId: venueId,
+            currentStep: "project_creation",
+            previousSteps: [],
+            userInputs: {
+              title,
+              subject,
+              keywords,
+              description,
+              venueId
+            }
+          }
+        })
+      });
+
+      const data = await response.json();
+
+      if (!data.ok) {
+        throw new Error(data.error || "AI 分析失败");
+      }
+
+      setAiAnalysis(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "AI 分析失败");
+    } finally {
+      setIsAnalyzing(false);
+    }
+  }
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -47,14 +125,25 @@ export default function NewProjectPage() {
     }
   }
 
+  useEffect(() => {
+    // 当用户输入变化时，自动触发AI分析
+    const timer = setTimeout(() => {
+      if (title && description && !isAnalyzing) {
+        analyzeWithAi();
+      }
+    }, 2000);
+
+    return () => clearTimeout(timer);
+  }, [title, description, keywords, subject, venueId]);
+
   return (
     <main className="single-panel-page">
       <section className="hero-card hero-card--compact">
         <div className="page-intro page-intro--stack">
           <div>
-            <span className="eyebrow">第 1 步 / 共 5 步</span>
+            <span className="eyebrow">第 1 步 / 共 6 步</span>
             <h1>新建论文项目</h1>
-            <p>第一步只做两件事：定研究主题，选投稿规则。等这一步明确了，后面再继续判断题目类型、拆框架和逐章写作。</p>
+            <p>AI 驱动的论文创作流程：输入你的研究想法，AI 会分析并生成相关建议，帮助你更好地规划论文。</p>
           </div>
           <Link className="secondary-button" href="/">
             返回项目首页
@@ -62,10 +151,11 @@ export default function NewProjectPage() {
         </div>
         <div className="mobile-step-strip top-gap">
           <span className="wizard-step active">1 定主题和方向</span>
-          <span className="wizard-step">2 判断题目类型</span>
-          <span className="wizard-step">3 拆论文框架</span>
-          <span className="wizard-step">4 分章节写作</span>
-          <span className="wizard-step">5 输出全文</span>
+          <span className="wizard-step">2 AI 分析与建议</span>
+          <span className="wizard-step">3 判断题目类型</span>
+          <span className="wizard-step">4 拆论文框架</span>
+          <span className="wizard-step">5 分章节写作</span>
+          <span className="wizard-step">6 输出全文</span>
         </div>
       </section>
 
@@ -124,6 +214,15 @@ export default function NewProjectPage() {
 
           <div className="field field--full">
             <button 
+              type="button" 
+              className="secondary-button" 
+              onClick={analyzeWithAi}
+              disabled={isAnalyzing}
+              style={{ marginBottom: '10px' }}
+            >
+              {isAnalyzing ? "AI 分析中..." : "AI 分析我的想法"}
+            </button>
+            <button 
               type="submit" 
               className="primary-button" 
               disabled={isSubmitting}
@@ -134,11 +233,96 @@ export default function NewProjectPage() {
         </form>
       </section>
 
+      {aiAnalysis && (
+        <section className="content-card">
+          <div className="card-heading card-heading--stack">
+            <span className="eyebrow">AI 分析结果</span>
+            <h2>AI 对您研究主题的分析和建议</h2>
+            <p>AI 已完成深度分析，包括思考过程、内容生成、质量检查和下一步预测。</p>
+          </div>
+          
+          <div className="stack-list">
+            <div className="line-item line-item--column">
+              <strong>AI 思考过程</strong>
+              <div style={{ backgroundColor: '#f5f5f5', padding: '12px', borderRadius: '8px', marginTop: '8px' }}>
+                <p>{aiAnalysis.thinking.thoughts}</p>
+                <div style={{ marginTop: '8px', fontSize: '14px', color: '#666' }}>
+                  <strong>置信度：</strong>{aiAnalysis.thinking.confidence}/100
+                </div>
+              </div>
+            </div>
+            
+            <div className="line-item line-item--column">
+              <strong>研究主题分析</strong>
+              <p>{aiAnalysis.content.content}</p>
+              <div style={{ marginTop: '8px', fontSize: '14px', color: '#666' }}>
+                <strong>字数：</strong>{aiAnalysis.content.metadata.wordCount} | 
+                <strong>阅读时间：</strong>{aiAnalysis.content.metadata.estimatedReadingTime}分钟 | 
+                <strong>主题：</strong>{aiAnalysis.content.metadata.topics.join(', ')}
+              </div>
+            </div>
+            
+            <div className="line-item line-item--column">
+              <strong>质量评估</strong>
+              <div style={{ backgroundColor: aiAnalysis.quality.approved ? '#e8f5e8' : '#ffebee', padding: '12px', borderRadius: '8px', marginBottom: '12px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <strong>整体评分：</strong>{aiAnalysis.quality.overallScore}/100
+                  <span style={{ 
+                    padding: '4px 12px', 
+                    borderRadius: '16px', 
+                    backgroundColor: aiAnalysis.quality.approved ? '#4caf50' : '#f44336', 
+                    color: 'white', 
+                    fontSize: '14px' 
+                  }}>
+                    {aiAnalysis.quality.approved ? '通过' : '需改进'}
+                  </span>
+                </div>
+              </div>
+              <div style={{ marginTop: '8px' }}>
+                {aiAnalysis.quality.criteria.map((criterion, index) => (
+                  <div key={index} style={{ marginBottom: '8px', padding: '8px', backgroundColor: '#f9f9f9', borderRadius: '4px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <strong>{criterion.name}</strong>
+                      <span>{criterion.score}/100</span>
+                    </div>
+                    <p style={{ margin: '4px 0', fontSize: '14px' }}>{criterion.feedback}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+            
+            <div className="line-item line-item--column">
+              <strong>改进建议</strong>
+              <ul style={{ margin: '8px 0' }}>
+                {aiAnalysis.quality.suggestions.map((suggestion, index) => (
+                  <li key={index} style={{ marginBottom: '8px', lineHeight: '1.4' }}>{suggestion}</li>
+                ))}
+              </ul>
+            </div>
+            
+            <div className="line-item line-item--column">
+              <strong>提前预览：后续两步</strong>
+              {aiAnalysis.nextSteps.map((step, index) => (
+                <div key={index} style={{ marginBottom: '16px', padding: '12px', backgroundColor: '#f0f7ff', borderRadius: '8px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <strong>第 {index + 2} 步：{step.step}</strong>
+                    <span style={{ padding: '2px 8px', borderRadius: '12px', backgroundColor: '#e3f2fd', fontSize: '12px' }}>
+                      {step.estimatedTime}分钟
+                    </span>
+                  </div>
+                  <p style={{ margin: '4px 0', lineHeight: '1.4' }}>{step.preview}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
       <section className="content-card">
         <div className="helper-banner helper-banner--stack">
           <div>
-            <strong>不知道该归到哪种论文路线，也没关系。</strong>
-            <p>移动版把判断题目类型单独放到下一步。你先把主题和规则定住，再让系统给出几种可选路线。</p>
+            <strong>AI 驱动的论文创作流程</strong>
+            <p>AI 会分析你的研究想法，提供专业建议，并预测后续步骤的内容，帮助你更高效地完成论文。</p>
           </div>
           <Link className="secondary-button" href="/projects/atelier-zero/profile?venue=ieee-iccci-2026">
             看下一步示例

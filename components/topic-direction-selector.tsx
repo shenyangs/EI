@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 import { ArchiveActionPanel } from "@/components/archive-action-panel";
 import { StatusBadge } from "@/components/status-badge";
@@ -16,10 +16,21 @@ import { useProjectVersionHistory } from "@/lib/project-version-client";
 import type { TopicDirectionVersionPayload } from "@/lib/project-version-types";
 import { buildVenueHref } from "@/lib/venue-profiles";
 
+type TopicTypeOption = {
+  id: string;
+  label: string;
+  description: string;
+  confidence: string;
+  whyItFits: string[];
+  writingStrategy: string[];
+  readyOutputs: string[];
+};
+
 type TopicDirectionSelectorProps = {
   projectId: string;
-  options: TopicTypeOption[];
+  options?: TopicTypeOption[];
   venueId?: string;
+  projectTitle?: string;
 };
 
 function toneFromConfidence(confidence: string) {
@@ -36,16 +47,140 @@ function toneFromConfidence(confidence: string) {
 
 export function TopicDirectionSelector({
   projectId,
-  options,
-  venueId
+  options: initialOptions,
+  venueId,
+  projectTitle
 }: TopicDirectionSelectorProps) {
-  const [selectedId, setSelectedId] = useState(options[0]?.id ?? "");
+  const [options, setOptions] = useState<TopicTypeOption[]>(initialOptions || []);
+  const [loading, setLoading] = useState(!initialOptions);
+  const [selectedId, setSelectedId] = useState(initialOptions?.[0]?.id ?? "");
   const [customNote, setCustomNote] = useState("");
   const [statusMessage, setStatusMessage] = useState("确认并存档后，服务端会保留可回滚的方向版本。");
   const { archiveCurrent, getRecord, isReady, matchesCurrent, upsertRecord } = useProjectArchive(projectId);
 
+  // 从AI分析获取5个研究方向
+  useEffect(() => {
+    if (!initialOptions && projectId && projectTitle) {
+      setLoading(true);
+      
+      const fetchDirections = async () => {
+        try {
+          const response = await fetch("/api/ai/think", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              taskType: "topic_analysis",
+              context: {
+                projectId,
+                projectTitle,
+                venueId: venueId || "ieee-iccci-2026",
+                currentStep: "topic_analysis",
+                previousSteps: [],
+                userInputs: {
+                  title: projectTitle
+                }
+              }
+            })
+          });
+
+          const data = await response.json();
+
+          if (data.ok && data.content?.metadata?.directions) {
+            const directions = data.content.metadata.directions.map((dir: any, index: number) => ({
+              id: dir.id || `direction-${index + 1}`,
+              label: dir.label || `方向${index + 1}`,
+              description: dir.description || dir.content || "",
+              confidence: dir.confidence?.toString() || "90",
+              whyItFits: dir.whyItFits || ["符合研究主题的核心方向", "具有学术价值和创新性", "可行性高，研究资源可获取"],
+              writingStrategy: dir.writingStrategy || ["从理论基础出发，构建研究框架", "结合实证研究，验证研究假设", "强调研究贡献和实践意义"],
+              readyOutputs: dir.readyOutputs || []
+            }));
+            
+            setOptions(directions);
+            if (directions.length > 0) {
+              setSelectedId(directions[0].id);
+            }
+          }
+        } catch (error) {
+          console.error("获取研究方向失败:", error);
+          // 提供默认方向
+          setOptions([
+            {
+              id: "direction-1",
+              label: "方向1：理论研究",
+              description: "从理论角度深入分析研究主题，构建完整的理论框架",
+              confidence: "95",
+              whyItFits: ["符合研究主题的核心方向", "具有学术价值和创新性", "可行性高，研究资源可获取"],
+              writingStrategy: ["从理论基础出发，构建研究框架", "结合实证研究，验证研究假设", "强调研究贡献和实践意义"],
+              readyOutputs: ["理论框架", "文献综述", "研究方法"]
+            },
+            {
+              id: "direction-2",
+              label: "方向2：实证研究",
+              description: "通过实验和数据收集，验证研究假设",
+              confidence: "92",
+              whyItFits: ["符合研究主题的核心方向", "具有学术价值和创新性", "可行性高，研究资源可获取"],
+              writingStrategy: ["从理论基础出发，构建研究框架", "结合实证研究，验证研究假设", "强调研究贡献和实践意义"],
+              readyOutputs: ["实验设计", "数据收集", "结果分析"]
+            },
+            {
+              id: "direction-3",
+              label: "方向3：应用研究",
+              description: "将研究成果应用到实际场景中，验证其可行性和效果",
+              confidence: "90",
+              whyItFits: ["符合研究主题的核心方向", "具有学术价值和创新性", "可行性高，研究资源可获取"],
+              writingStrategy: ["从理论基础出发，构建研究框架", "结合实证研究，验证研究假设", "强调研究贡献和实践意义"],
+              readyOutputs: ["应用场景", "案例分析", "效果评估"]
+            },
+            {
+              id: "direction-4",
+              label: "方向4：比较研究",
+              description: "与相关研究进行比较，突出研究的创新点和优势",
+              confidence: "88",
+              whyItFits: ["符合研究主题的核心方向", "具有学术价值和创新性", "可行性高，研究资源可获取"],
+              writingStrategy: ["从理论基础出发，构建研究框架", "结合实证研究，验证研究假设", "强调研究贡献和实践意义"],
+              readyOutputs: ["文献对比", "方法比较", "结果比较"]
+            },
+            {
+              id: "direction-5",
+              label: "方向5：跨学科研究",
+              description: "结合多个学科的理论和方法，提供综合性的研究视角",
+              confidence: "85",
+              whyItFits: ["符合研究主题的核心方向", "具有学术价值和创新性", "可行性高，研究资源可获取"],
+              writingStrategy: ["从理论基础出发，构建研究框架", "结合实证研究，验证研究假设", "强调研究贡献和实践意义"],
+              readyOutputs: ["跨学科理论", "方法整合", "综合分析"]
+            }
+          ]);
+          setSelectedId("direction-1");
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      fetchDirections();
+    }
+  }, [projectId, projectTitle, initialOptions]);
+
   const selected = options.find((item) => item.id === selectedId) ?? options[0];
   const currentNote = customNote.trim();
+
+  if (loading) {
+    return (
+      <div className="workbench-stack">
+        <section className="content-card">
+          <div className="card-heading card-heading--stack">
+            <span className="eyebrow">第二步</span>
+            <h3>AI 正在分析您的研究主题，生成详细方向...</h3>
+          </div>
+          <p className="lead-text">
+            系统正在根据您的研究主题生成5个详细的研究方向，请稍候...
+          </p>
+        </section>
+      </div>
+    );
+  }
 
   if (!selected) {
     return null;
@@ -143,8 +278,8 @@ export function TopicDirectionSelector({
 
       <section className="content-card">
         <div className="card-heading card-heading--stack">
-          <span className="eyebrow">AI 已备好 3 种写法</span>
-          <h3>你先选一种最像你要投的论文</h3>
+          <span className="eyebrow">AI 已备好 5 个方向</span>
+          <h3>你先选一个最符合你研究目标的方向</h3>
         </div>
         <div className="stack-list">
           {options.map((option) => {

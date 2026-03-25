@@ -8,10 +8,10 @@ export default async function ProfilePage({
   searchParams
 }: {
   params: Promise<{ projectId: string }>;
-  searchParams: Promise<{ venue?: string }>;
+  searchParams: Promise<{ venue?: string; title?: string }>;
 }) {
   const { projectId } = await params;
-  const { venue } = await searchParams;
+  const { venue, title } = await searchParams;
   const project = getProjectById(projectId);
 
   if (!project) {
@@ -20,9 +20,9 @@ export default async function ProfilePage({
 
   return (
     <TopicDirectionSelector
-      options={project.topicTypeOptions}
       projectId={project.id}
       venueId={venue}
+      projectTitle={title || project.title}
     />
   );
 }

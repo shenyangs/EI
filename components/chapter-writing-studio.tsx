@@ -18,6 +18,7 @@ import type { ChapterVersionPayload } from "@/lib/project-version-types";
 import type { AiQualityReport } from "@/lib/quality-check";
 import { buildVenueHref, type VenueProfile } from "@/lib/venue-profiles";
 
+
 type DraftResponse = {
   ok: boolean;
   content?: string;
@@ -153,6 +154,7 @@ export function ChapterWritingStudio({
   );
   const [reviewMap, setReviewMap] = useState<Record<string, AiQualityReport | null>>({});
   const [checkingMap, setCheckingMap] = useState<Record<string, boolean>>({});
+  const [aiAnalysisMap, setAiAnalysisMap] = useState<Record<string, any>>({});
   const [isPending, startTransition] = useTransition();
   const inFlightIdsRef = useRef(new Set<string>());
   const {
@@ -255,18 +257,64 @@ export function ChapterWritingStudio({
     }
   }
 
-  useEffect(() => {
-    if (reviewMap[activeChapter.id] || checkingMap[activeChapter.id]) {
+  async function analyzeChapterWithAi(chapterId: string, chapter: ChapterDraft) {
+    if (inFlightIdsRef.current.has(chapterId)) {
       return;
     }
 
-    void runChapterCheck(
-      activeChapter.id,
-      activeParagraphs,
-      activeChapter.goal,
-      activeChapter.title
-    );
-  }, [activeChapter, activeParagraphs, checkingMap, reviewMap]);
+    inFlightIdsRef.current.add(chapterId);
+    setCheckingMap((current) => ({
+      ...current,
+      [chapterId]: true
+    }));
+
+    try {
+      // 直接使用 requestDraft 函数来生成内容，而不是使用 AiOrchestrator
+      const result = await requestDraft(
+        `请为论文《${projectTitle}》的“${chapter.title}”章节生成正式草稿。
+要求：
+1. 保留章节目标：${chapter.goal}
+2. 结合当前章节摘要：${chapter.summary}
+3. 语气像 ${venueProfile.name} 对应的会议论文，不要空泛
+4. 不编造参考文献
+5. 只输出正文内容`
+      );
+
+      if (!result.ok || !result.content) {
+        throw new Error(result.error ?? "AI 分析失败");
+      }
+
+      // 更新内容
+      const nextParagraphs = result.content
+        .split(/\n{2,}/)
+        .map((item) => item.trim())
+        .filter(Boolean);
+
+      setDraftMap((current) => ({
+        ...current,
+        [chapterId]: nextParagraphs.length > 0 ? nextParagraphs : [result.content]
+      }));
+
+      setMessage(`AI 已完成对“${chapter.title}”的内容生成。`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "AI 分析失败。";
+      setMessage(`AI 分析失败：${message}`);
+    } finally {
+      inFlightIdsRef.current.delete(chapterId);
+      setCheckingMap((current) => ({
+        ...current,
+        [chapterId]: false
+      }));
+    }
+  }
+
+  useEffect(() => {
+    if (aiAnalysisMap[activeChapter.id] || checkingMap[activeChapter.id]) {
+      return;
+    }
+
+    void analyzeChapterWithAi(activeChapter.id, activeChapter);
+  }, [activeChapter, checkingMap, aiAnalysisMap]);
 
   useEffect(() => {
     let cancelled = false;
@@ -277,13 +325,11 @@ export function ChapterWritingStudio({
           return;
         }
 
-        if (reviewMap[chapter.id] || inFlightIdsRef.current.has(chapter.id)) {
+        if (aiAnalysisMap[chapter.id] || inFlightIdsRef.current.has(chapter.id)) {
           continue;
         }
 
-        const paragraphs = draftMap[chapter.id] ?? chapter.paragraphs;
-
-        await runChapterCheck(chapter.id, paragraphs, chapter.goal, chapter.title);
+        await analyzeChapterWithAi(chapter.id, chapter);
       }
     }
 
@@ -292,43 +338,62 @@ export function ChapterWritingStudio({
     return () => {
       cancelled = true;
     };
-  }, [chapters, draftMap, reviewMap]);
+  }, [chapters, aiAnalysisMap]);
 
   function regenerateCurrentChapter() {
     startTransition(async () => {
       setMessage(`正在重写“${activeChapter.title}”...`);
 
-      const result = await requestDraft(
-        `请为论文《${projectTitle}》的“${activeChapter.title}”章节生成 3 段正式草稿。
-要求：
-1. 保留章节目标：${activeChapter.goal}
-2. 结合当前章节摘要：${activeChapter.summary}
-3. 语气像 ${venueProfile.name} 对应的会议论文，不要空泛
-4. 不编造参考文献
-5. 只输出正文内容`
-      );
+      try {
+        const context: AiTaskContext = {
+          projectId,
+          projectTitle,
+          venueId: venueProfile.id,
+          currentStep: "chapter_writing",
+          previousSteps: [],
+          userInputs: {
+            chapterId: activeChapter.id,
+            chapterTitle: activeChapter.title,
+            chapterGoal: activeChapter.goal,
+            chapterSummary: activeChapter.summary,
+            currentContent: (draftMap[activeChapter.id] ?? activeChapter.paragraphs).join("\n\n"),
+            regenerate: true
+          }
+        };
 
-      if (!result.ok || !result.content) {
-        setMessage(result.error ?? "重写失败，请稍后再试。");
-        return;
+        const result = await AiOrchestrator.runTask("chapter_writing", context);
+        
+        // 更新内容
+        const nextParagraphs = result.content.content
+          .split(/\n{2,}/)
+          .map((item) => item.trim())
+          .filter(Boolean);
+
+        setDraftMap((current) => ({
+          ...current,
+          [activeChapter.id]: nextParagraphs.length > 0 ? nextParagraphs : [result.content.content]
+        }));
+
+        // 生成改稿意见
+        const revisionSuggestions = await AiOrchestrator.generateRevisionSuggestions(
+          result.content.content,
+          result.quality,
+          context
+        );
+
+        setAiAnalysisMap((current) => ({
+          ...current,
+          [activeChapter.id]: {
+            ...result,
+            revisionSuggestions
+          }
+        }));
+
+        setMessage(`“${activeChapter.title}”已经重写完成，AI 已完成深度分析。`);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "重写失败，请稍后再试。";
+        setMessage(message);
       }
-
-      const nextParagraphs = result.content
-        .split(/\n{2,}/)
-        .map((item) => item.trim())
-        .filter(Boolean);
-
-      setDraftMap((current) => ({
-        ...current,
-        [activeChapter.id]: nextParagraphs.length > 0 ? nextParagraphs : [result.content!]
-      }));
-      setMessage(`“${activeChapter.title}”已经重写完成，正在自动自检。`);
-      await runChapterCheck(
-        activeChapter.id,
-        nextParagraphs.length > 0 ? nextParagraphs : [result.content!],
-        activeChapter.goal,
-        activeChapter.title
-      );
     });
   }
 
@@ -341,41 +406,56 @@ export function ChapterWritingStudio({
     startTransition(async () => {
       setMessage(`正在按你的要求修改“${activeChapter.title}”...`);
 
-      const result = await requestDraft(
-        `请修改论文《${projectTitle}》的“${activeChapter.title}”章节。
-当前章节目标：${activeChapter.goal}
-当前会议规则：${venueProfile.name}；摘要规则：${venueProfile.abstractRule}；篇幅规则：${venueProfile.pageRule}；引用规则：${venueProfile.referenceRule}
-用户要求：${customInstruction}
-当前内容：
-${activeParagraphs.join("\n\n")}
+      try {
+        const context: AiTaskContext = {
+          projectId,
+          projectTitle,
+          venueId: venueProfile.id,
+          currentStep: "chapter_writing",
+          previousSteps: [],
+          userInputs: {
+            chapterId: activeChapter.id,
+            chapterTitle: activeChapter.title,
+            chapterGoal: activeChapter.goal,
+            chapterSummary: activeChapter.summary,
+            currentContent: activeParagraphs.join("\n\n"),
+            customInstruction: customInstruction
+          }
+        };
 
-要求：
-1. 保留章节逻辑
-2. 明显响应用户要求
-3. 只输出修改后的正文`
-      );
+        const result = await AiOrchestrator.runTask("revision_suggestions", context);
+        
+        // 更新内容
+        const nextParagraphs = result.content.content
+          .split(/\n{2,}/)
+          .map((item) => item.trim())
+          .filter(Boolean);
 
-      if (!result.ok || !result.content) {
-        setMessage(result.error ?? "按要求修改失败。");
-        return;
+        setDraftMap((current) => ({
+          ...current,
+          [activeChapter.id]: nextParagraphs.length > 0 ? nextParagraphs : [result.content.content]
+        }));
+
+        // 生成改稿意见
+        const revisionSuggestions = await AiOrchestrator.generateRevisionSuggestions(
+          result.content.content,
+          result.quality,
+          context
+        );
+
+        setAiAnalysisMap((current) => ({
+          ...current,
+          [activeChapter.id]: {
+            ...result,
+            revisionSuggestions
+          }
+        }));
+
+        setMessage("已经按你的要求更新当前章节，AI 已完成深度分析。");
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "按要求修改失败。";
+        setMessage(message);
       }
-
-      const nextParagraphs = result.content
-        .split(/\n{2,}/)
-        .map((item) => item.trim())
-        .filter(Boolean);
-
-      setDraftMap((current) => ({
-        ...current,
-        [activeChapter.id]: nextParagraphs.length > 0 ? nextParagraphs : [result.content!]
-      }));
-      setMessage("已经按你的要求更新当前章节，正在自动自检。");
-      await runChapterCheck(
-        activeChapter.id,
-        nextParagraphs.length > 0 ? nextParagraphs : [result.content!],
-        activeChapter.goal,
-        activeChapter.title
-      );
     });
   }
 

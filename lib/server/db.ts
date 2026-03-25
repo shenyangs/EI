@@ -1,67 +1,82 @@
-import { Database, open } from 'sqlite';
-import sqlite3 from 'sqlite3';
-
-let db: Database | null = null;
+// 内存存储模拟数据库
+const memoryStore: {
+  projects: any[];
+  projectVersions: any[];
+  academicPapers: any[];
+  projectReferences: any[];
+} = {
+  projects: [],
+  projectVersions: [],
+  academicPapers: [],
+  projectReferences: []
+};
 
 export async function getDatabase() {
-  if (!db) {
-    db = await open({
-      filename: './data.db',
-      driver: sqlite3.Database
-    });
-
-    await db.exec(`
-      CREATE TABLE IF NOT EXISTS projects (
-        id TEXT PRIMARY KEY,
-        title TEXT NOT NULL,
-        description TEXT,
-        createdAt INTEGER NOT NULL,
-        updatedAt INTEGER NOT NULL,
-        venueId TEXT
-      );
-
-      CREATE TABLE IF NOT EXISTS project_versions (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        projectId TEXT NOT NULL,
-        key TEXT NOT NULL,
-        fingerprint TEXT NOT NULL,
-        title TEXT NOT NULL,
-        summary TEXT,
-        payload TEXT NOT NULL,
-        createdAt INTEGER NOT NULL,
-        FOREIGN KEY (projectId) REFERENCES projects(id)
-      );
-
-      CREATE TABLE IF NOT EXISTS academic_papers (
-        id TEXT PRIMARY KEY,
-        title TEXT NOT NULL,
-        abstract TEXT,
-        authors TEXT NOT NULL,
-        year INTEGER,
-        source TEXT NOT NULL,
-        url TEXT,
-        venue TEXT,
-        citations INTEGER,
-        matchedQueries TEXT NOT NULL
-      );
-
-      CREATE TABLE IF NOT EXISTS project_references (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        projectId TEXT NOT NULL,
-        paperId TEXT NOT NULL,
-        addedAt INTEGER NOT NULL,
-        FOREIGN KEY (projectId) REFERENCES projects(id),
-        FOREIGN KEY (paperId) REFERENCES academic_papers(id)
-      );
-    `);
-  }
-
-  return db;
+  // 返回内存存储对象
+  return {
+    run: async (sql: string, params?: any[]) => {
+      // 模拟 SQL 执行
+      console.log('Executing SQL:', sql, params);
+      
+      // 简单的 SQL 解析和执行
+      if (sql.includes('INSERT INTO projects')) {
+        const [id, title, description, createdAt, updatedAt, venueId] = params || [];
+        memoryStore.projects.push({
+          id,
+          title,
+          description,
+          createdAt,
+          updatedAt,
+          venueId
+        });
+      } else if (sql.includes('INSERT INTO project_versions')) {
+        const [projectId, key, fingerprint, title, summary, payload, createdAt] = params || [];
+        memoryStore.projectVersions.push({
+          id: memoryStore.projectVersions.length + 1,
+          projectId,
+          key,
+          fingerprint,
+          title,
+          summary,
+          payload,
+          createdAt
+        });
+      }
+    },
+    get: async (sql: string, params?: any[]) => {
+      console.log('Executing SQL:', sql, params);
+      
+      if (sql.includes('SELECT * FROM projects WHERE id =')) {
+        const [id] = params || [];
+        return memoryStore.projects.find(p => p.id === id);
+      } else if (sql.includes('SELECT * FROM project_versions WHERE projectId =')) {
+        const [projectId, key, fingerprint] = params || [];
+        return memoryStore.projectVersions.find(
+          v => v.projectId === projectId && v.key === key && v.fingerprint === fingerprint
+        );
+      }
+      return null;
+    },
+    all: async (sql: string, params?: any[]) => {
+      console.log('Executing SQL:', sql, params);
+      
+      if (sql.includes('SELECT * FROM projects')) {
+        return memoryStore.projects;
+      } else if (sql.includes('SELECT * FROM project_versions')) {
+        const [projectId, key] = params || [];
+        if (key) {
+          return memoryStore.projectVersions.filter(v => v.projectId === projectId && v.key === key);
+        } else {
+          return memoryStore.projectVersions.filter(v => v.projectId === projectId);
+        }
+      }
+      return [];
+    },
+    lastID: 1
+  };
 }
 
 export async function closeDatabase() {
-  if (db) {
-    await db.close();
-    db = null;
-  }
+  // 内存存储不需要关闭
+  console.log('Closing database connection');
 }

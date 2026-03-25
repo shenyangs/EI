@@ -20,9 +20,15 @@ import { buildVenueHref } from "@/lib/venue-profiles";
 
 type OutlineWorkbenchProps = {
   projectId: string;
-  packages: TitlePackage[];
-  outline: OutlineSection[];
+  packages?: TitlePackage[];
+  outline?: OutlineSection[];
   venueId?: string;
+  selectedDirection?: {
+    id: string;
+    label: string;
+    description: string;
+  };
+  projectTitle?: string;
 };
 
 type CheckResponse = {

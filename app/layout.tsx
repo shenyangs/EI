@@ -16,8 +16,6 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const ai = getAiCapabilitySnapshot();
-
   return (
     <html lang="zh-CN">
       <body>
@@ -35,8 +33,8 @@ export default function RootLayout({
             </div>
             <div className="site-header__panel">
               <ConnectionLights
-                initialModelConnected={ai.canGeneratePaperDraft}
-                initialWebSearchConnected={ai.canUseWebSearch}
+                initialModelConnected={false}
+                initialWebSearchConnected={false}
               />
               <div className="site-header__tools">
                 <Link className="ghost-chip" href="/projects/new">

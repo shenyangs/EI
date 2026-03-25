@@ -7,17 +7,46 @@ import { ProjectCard } from "@/components/project-card";
 import { getAiCapabilitySnapshot } from "@/lib/ai-runtime";
 import { projectCards } from "@/lib/demo-data";
 
-type Project = {
-  id: string;
-  title: string;
-  description?: string;
-  createdAt: number;
-  updatedAt: number;
-  venueId?: string;
-};
+import type { ProjectCardItem } from "@/lib/demo-data";
+
+type Project = ProjectCardItem;
 
 export default function HomePage() {
-  const ai = getAiCapabilitySnapshot();
+  const [ai, setAi] = useState({
+    provider: "minimax" as const,
+    model: "MiniMax-M2.7",
+    baseUrl: "https://api.minimaxi.com/v1",
+    hasApiKey: false,
+    webSearchEnabled: true,
+    webSearchMode: "minimax_mcp" as const,
+    canGeneratePaperDraft: false,
+    canUseWebSearch: false
+  });
+
+  useEffect(() => {
+    async function fetchAiStatus() {
+      try {
+        const response = await fetch("/api/ai/status", { cache: "no-store" });
+        if (response.ok) {
+          const data = await response.json();
+          setAi({
+            provider: data.provider,
+            model: data.model,
+            baseUrl: data.baseUrl,
+            hasApiKey: data.hasApiKey,
+            webSearchEnabled: data.webSearchEnabled,
+            webSearchMode: data.webSearchMode,
+            canGeneratePaperDraft: data.canGeneratePaperDraft,
+            canUseWebSearch: data.canUseWebSearch
+          });
+        }
+      } catch (error) {
+        console.error("Failed to fetch AI status:", error);
+      }
+    }
+
+    fetchAiStatus();
+  }, []);
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
 

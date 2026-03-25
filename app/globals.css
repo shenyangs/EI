@@ -1896,7 +1896,7 @@ body::after,
 .chapter-menu__item,
 .choice-card,
 .project-card {
-  transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+  transition: transform 200ms cubic-bezier(0.4, 0, 0.2, 1), border-color 200ms ease, box-shadow 200ms ease;
 }
 
 .line-item--link,
@@ -2029,7 +2029,7 @@ body::after,
   padding: 8px 4px 6px;
   border-radius: 16px;
   color: var(--muted);
-  transition: transform 160ms ease, color 160ms ease, background 160ms ease;
+  transition: transform 200ms cubic-bezier(0.4, 0, 0.2, 1), color 200ms ease, background 200ms ease;
 }
 
 .project-nav__dock-item:hover {
