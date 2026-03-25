@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
-
-import { generatePaperDraft } from "@/lib/minimax-client";
+import { generateContent } from "@/lib/ai/ai-orchestrator";
 
 type DraftRequestBody = {
   prompt?: string;
   systemPrompt?: string;
+  temperature?: number;
+  modelId?: number;
 };
 
 export async function POST(request: Request) {
@@ -33,14 +34,19 @@ export async function POST(request: Request) {
   }
 
   try {
-    const result = await generatePaperDraft({
-      prompt: body.prompt,
-      systemPrompt: body.systemPrompt
-    });
+    const result = await generateContent(
+      body.prompt,
+      body.systemPrompt,
+      body.modelId
+    );
 
     return NextResponse.json({
       ok: true,
-      ...result
+      content: result.content,
+      usage: result.usage,
+      model: result.model,
+      fallback: result.fallback,
+      originalProvider: result.originalProvider
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "模型调用失败。";

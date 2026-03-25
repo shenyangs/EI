@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { streamAiTask, StreamingAiProcessor } from "@/lib/streaming-ai";
 
 import { ArchiveActionPanel } from "@/components/archive-action-panel";
 import { QualityReviewPanel } from "@/components/quality-review-panel";
@@ -344,38 +345,50 @@ export function ChapterWritingStudio({
   function regenerateCurrentChapter() {
     startTransition(async () => {
       setMessage(`正在重写“${activeChapter.title}”...`);
+      
+      try {
+        let generatedContent = "";
+        
+        // 使用流式传输
+        for await (const chunk of streamAiTask('content_generation', {
+          prompt: `请为论文《${projectTitle}》的“${activeChapter.title}”章节生成 3 段正式草稿。\n要求：\n1. 保留章节目标：${activeChapter.goal}\n2. 结合当前章节摘要：${activeChapter.summary}\n3. 语气像 ${venueProfile.name} 对应的会议论文，不要空泛\n4. 不编造参考文献\n5. 只输出正文内容`,
+          systemPrompt: "你是一个面向服装、设计、时尚、人文社科与技术交叉研究的 EI 论文写作助手。输出必须结构清晰、学术表达克制，不编造引用，不要输出思考过程、推理标签或<think>内容。"
+        })) {
+          if (chunk.type === 'content' && chunk.data.content) {
+            generatedContent = chunk.data.content;
+            // 实时更新内容，提供即时反馈
+            const nextParagraphs = generatedContent
+              .split(/\n{2,}/)
+              .map((item) => item.trim())
+              .filter(Boolean);
+            
+            setDraftMap((current) => ({
+              ...current,
+              [activeChapter.id]: nextParagraphs.length > 0 ? nextParagraphs : [generatedContent]
+            }));
+          }
+        }
 
-      const result = await requestDraft(
-        `请为论文《${projectTitle}》的“${activeChapter.title}”章节生成 3 段正式草稿。
-要求：
-1. 保留章节目标：${activeChapter.goal}
-2. 结合当前章节摘要：${activeChapter.summary}
-3. 语气像 ${venueProfile.name} 对应的会议论文，不要空泛
-4. 不编造参考文献
-5. 只输出正文内容`
-      );
+        if (!generatedContent) {
+          setMessage("重写失败，请稍后再试。");
+          return;
+        }
 
-      if (!result.ok || !result.content) {
-        setMessage(result.error ?? "重写失败，请稍后再试。");
-        return;
+        const nextParagraphs = generatedContent
+          .split(/\n{2,}/)
+          .map((item) => item.trim())
+          .filter(Boolean);
+
+        setMessage(`“${activeChapter.title}”已经重写完成，正在自动自检。`);
+        await runChapterCheck(
+          activeChapter.id,
+          nextParagraphs.length > 0 ? nextParagraphs : [generatedContent],
+          activeChapter.goal,
+          activeChapter.title
+        );
+      } catch (error) {
+        setMessage(`重写失败：${error instanceof Error ? error.message : '未知错误'}`);
       }
-
-      const nextParagraphs = result.content
-        .split(/\n{2,}/)
-        .map((item) => item.trim())
-        .filter(Boolean);
-
-      setDraftMap((current) => ({
-        ...current,
-        [activeChapter.id]: nextParagraphs.length > 0 ? nextParagraphs : [result.content!]
-      }));
-      setMessage(`“${activeChapter.title}”已经重写完成，正在自动自检。`);
-      await runChapterCheck(
-        activeChapter.id,
-        nextParagraphs.length > 0 ? nextParagraphs : [result.content!],
-        activeChapter.goal,
-        activeChapter.title
-      );
     });
   }
 
@@ -389,28 +402,42 @@ export function ChapterWritingStudio({
       setMessage(`正在按你的要求修改“${activeChapter.title}”...`);
 
       try {
-        const result = await requestDraft(
-          `请按照以下要求修改论文《${projectTitle}》的“${activeChapter.title}”章节：\n${customInstruction}\n\n当前章节内容：\n${activeParagraphs.join("\n\n")}\n\n要求：\n1. 保留章节目标：${activeChapter.goal}\n2. 结合当前章节摘要：${activeChapter.summary}\n3. 语气像 ${venueProfile.name} 对应的会议论文，不要空泛\n4. 不编造参考文献\n5. 只输出修改后的正文内容`
-        );
+        let generatedContent = "";
+        
+        // 使用流式传输
+        for await (const chunk of streamAiTask('content_generation', {
+          prompt: `请按照以下要求修改论文《${projectTitle}》的“${activeChapter.title}”章节：\n${customInstruction}\n\n当前章节内容：\n${activeParagraphs.join("\n\n")}\n\n要求：\n1. 保留章节目标：${activeChapter.goal}\n2. 结合当前章节摘要：${activeChapter.summary}\n3. 语气像 ${venueProfile.name} 对应的会议论文，不要空泛\n4. 不编造参考文献\n5. 只输出修改后的正文内容`,
+          systemPrompt: "你是一个面向服装、设计、时尚、人文社科与技术交叉研究的 EI 论文写作助手。输出必须结构清晰、学术表达克制，不编造引用，不要输出思考过程、推理标签或<think>内容。"
+        })) {
+          if (chunk.type === 'content' && chunk.data.content) {
+            generatedContent = chunk.data.content;
+            // 实时更新内容，提供即时反馈
+            const nextParagraphs = generatedContent
+              .split(/\n{2,}/)
+              .map((item) => item.trim())
+              .filter(Boolean);
+            
+            setDraftMap((current) => ({
+              ...current,
+              [activeChapter.id]: nextParagraphs.length > 0 ? nextParagraphs : [generatedContent]
+            }));
+          }
+        }
 
-        if (!result.ok || !result.content) {
-          setMessage(result.error ?? "修改失败，请稍后再试。");
+        if (!generatedContent) {
+          setMessage("修改失败，请稍后再试。");
           return;
         }
 
-        const nextParagraphs = result.content
+        const nextParagraphs = generatedContent
           .split(/\n{2,}/)
           .map((item) => item.trim())
           .filter(Boolean);
 
-        setDraftMap((current) => ({
-          ...current,
-          [activeChapter.id]: nextParagraphs.length > 0 ? nextParagraphs : [result.content!]
-        }));
         setMessage(`“${activeChapter.title}”已经按你的要求修改完成，正在自动自检。`);
         await runChapterCheck(
           activeChapter.id,
-          nextParagraphs.length > 0 ? nextParagraphs : [result.content!],
+          nextParagraphs.length > 0 ? nextParagraphs : [generatedContent],
           activeChapter.goal,
           activeChapter.title
         );

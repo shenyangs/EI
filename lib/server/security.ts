@@ -1,0 +1,308 @@
+import { NextRequest, NextResponse } from 'next/server';
+import bcrypt from 'bcrypt';
+import { logger } from './logger';
+
+// 密码加密 - 使用更高强度
+export async function hashPassword(password: string): Promise<string> {
+  const saltRounds = 14; // 增加强度
+  return bcrypt.hash(password, saltRounds);
+}
+
+// 密码验证
+export async function verifyPassword(password: string, hashedPassword: string): Promise<boolean> {
+  return bcrypt.compare(password, hashedPassword);
+}
+
+// 输入验证 - 增强版
+export function validateInput(input: string): string {
+  return input
+    .replace(/<script[^>]*>.*?<\/script>/gi, '')
+    .replace(/<iframe[^>]*>.*?<\/iframe>/gi, '')
+    .replace(/<object[^>]*>.*?<\/object>/gi, '')
+    .replace(/<embed[^>]*>.*?<\/embed>/gi, '')
+    .replace(/javascript:/gi, '')
+    .replace(/on\w+\s*=/gi, '')
+    .trim();
+}
+
+// 安全的CORS配置
+const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS?.split(',') || [
+  'http://localhost:3000',
+  'https://localhost:3000'
+];
+
+export function corsMiddleware(request: NextRequest) {
+  const origin = request.headers.get('origin');
+  const response = NextResponse.next();
+  
+  // 只允许特定来源
+  if (origin && ALLOWED_ORIGINS.includes(origin)) {
+    response.headers.set('Access-Control-Allow-Origin', origin);
+  }
+  
+  response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+  response.headers.set('Access-Control-Allow-Credentials', 'true');
+  response.headers.set('Access-Control-Max-Age', '86400'); // 24小时
+  
+  return response;
+}
+
+// 安全Headers中间件
+export function securityHeadersMiddleware(request: NextRequest) {
+  const response = NextResponse.next();
+  
+  // HSTS - 强制HTTPS
+  response.headers.set(
+    'Strict-Transport-Security',
+    'max-age=31536000; includeSubDomains; preload'
+  );
+  
+  // CSP - 内容安全策略
+  response.headers.set(
+    'Content-Security-Policy',
+    [
+      "default-src 'self'",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+      "style-src 'self' 'unsafe-inline'",
+      "img-src 'self' data: https:",
+      "font-src 'self'",
+      "connect-src 'self' https:",
+      "frame-ancestors 'none'",
+      "base-uri 'self'",
+      "form-action 'self'"
+    ].join('; ')
+  );
+  
+  // 防止MIME类型嗅探
+  response.headers.set('X-Content-Type-Options', 'nosniff');
+  
+  // 防止点击劫持
+  response.headers.set('X-Frame-Options', 'DENY');
+  
+  // XSS保护
+  response.headers.set('X-XSS-Protection', '1; mode=block');
+  
+  // 引用策略
+  response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+  
+  // 权限策略
+  response.headers.set(
+    'Permissions-Policy',
+    'camera=(), microphone=(), geolocation=(), payment=()'
+  );
+  
+  return response;
+}
+
+// HTTPS重定向中间件 - 增强版
+export function httpsRedirectMiddleware(request: NextRequest) {
+  const proto = request.headers.get('x-forwarded-proto');
+  const host = request.headers.get('host');
+  
+  // 检查是否需要HTTPS重定向
+  if (process.env.NODE_ENV === 'production' && proto !== 'https') {
+    // 检查是否是健康检查端点（允许HTTP）
+    if (request.nextUrl.pathname === '/api/health') {
+      return NextResponse.next();
+    }
+    
+    const url = request.nextUrl.clone();
+    url.protocol = 'https';
+    url.port = '';
+    
+    // 记录重定向
+    logger.info('HTTPS redirect', {
+      from: `http://${host}${request.nextUrl.pathname}`,
+      to: url.toString()
+    });
+    
+    return NextResponse.redirect(url, 301); // 使用301永久重定向
+  }
+  
+  return NextResponse.next();
+}
+
+// 增强的速率限制中间件
+interface RateLimitConfig {
+  windowMs: number;
+  maxRequests: number;
+  skipSuccessfulRequests?: boolean;
+}
+
+const defaultConfig: RateLimitConfig = {
+  windowMs: 60 * 1000, // 1分钟
+  maxRequests: 60,
+  skipSuccessfulRequests: false
+};
+
+// 不同端点的速率限制配置
+const endpointConfigs: Map<string, RateLimitConfig> = new Map([
+  ['/api/auth/login', { windowMs: 15 * 60 * 1000, maxRequests: 5 }], // 登录：15分钟5次
+  ['/api/auth/register', { windowMs: 60 * 60 * 1000, maxRequests: 3 }], // 注册：1小时3次
+  ['/api/ai/generate', { windowMs: 60 * 1000, maxRequests: 10 }], // AI生成：1分钟10次
+]);
+
+class RateLimiter {
+  private requests = new Map<string, Array<number>>();
+  
+  isAllowed(key: string, config: RateLimitConfig): boolean {
+    const now = Date.now();
+    const windowStart = now - config.windowMs;
+    
+    // 获取该key的请求历史
+    let timestamps = this.requests.get(key) || [];
+    
+    // 清理过期请求
+    timestamps = timestamps.filter(time => time > windowStart);
+    
+    // 检查是否超过限制
+    if (timestamps.length >= config.maxRequests) {
+      this.requests.set(key, timestamps);
+      return false;
+    }
+    
+    // 记录新请求
+    timestamps.push(now);
+    this.requests.set(key, timestamps);
+    
+    return true;
+  }
+  
+  getRetryAfter(key: string, config: RateLimitConfig): number {
+    const timestamps = this.requests.get(key) || [];
+    if (timestamps.length === 0) return 0;
+    
+    const oldestRequest = Math.min(...timestamps);
+    const retryAfter = Math.ceil((oldestRequest + config.windowMs - Date.now()) / 1000);
+    return Math.max(0, retryAfter);
+  }
+}
+
+const rateLimiter = new RateLimiter();
+
+export function rateLimitMiddleware(request: NextRequest) {
+  const ip = request.headers.get('x-forwarded-for')?.split(',')[0] || request.headers.get('x-real-ip') || 'unknown';
+  const endpoint = request.nextUrl.pathname;
+  const method = request.method;
+  
+  // 获取该端点的配置或使用默认配置
+  const config = endpointConfigs.get(endpoint) || defaultConfig;
+  
+  // 生成唯一的限制key
+  const limitKey = `${ip}:${endpoint}:${method}`;
+  
+  // 检查是否允许请求
+  if (!rateLimiter.isAllowed(limitKey, config)) {
+    const retryAfter = rateLimiter.getRetryAfter(limitKey, config);
+    
+    logger.warn('Rate limit exceeded', {
+      ip,
+      endpoint,
+      method,
+      retryAfter
+    });
+    
+    return NextResponse.json(
+      {
+        error: 'Too many requests',
+        message: 'Please try again later',
+        retryAfter
+      },
+      {
+        status: 429,
+        headers: {
+          'Retry-After': String(retryAfter),
+          'X-RateLimit-Limit': String(config.maxRequests),
+          'X-RateLimit-Remaining': '0',
+          'X-RateLimit-Reset': String(Date.now() + config.windowMs)
+        }
+      }
+    );
+  }
+  
+  return NextResponse.next();
+}
+
+// CSRF保护中间件
+export function csrfMiddleware(request: NextRequest) {
+  // 对于非修改请求，跳过CSRF检查
+  if (['GET', 'HEAD', 'OPTIONS'].includes(request.method)) {
+    return NextResponse.next();
+  }
+  
+  const origin = request.headers.get('origin');
+  const referer = request.headers.get('referer');
+  
+  // 检查Origin头
+  if (!origin) {
+    logger.warn('CSRF check failed: Missing origin header', {
+      path: request.nextUrl.pathname,
+      method: request.method
+    });
+    
+    return NextResponse.json(
+      { error: 'CSRF validation failed' },
+      { status: 403 }
+    );
+  }
+  
+  // 验证Origin是否在允许列表中
+  if (!ALLOWED_ORIGINS.includes(origin)) {
+    logger.warn('CSRF check failed: Invalid origin', {
+      origin,
+      path: request.nextUrl.pathname
+    });
+    
+    return NextResponse.json(
+      { error: 'CSRF validation failed' },
+      { status: 403 }
+    );
+  }
+  
+  return NextResponse.next();
+}
+
+// 请求大小限制中间件
+export function requestSizeMiddleware(maxSize: number = 10 * 1024 * 1024) { // 默认10MB
+  return (request: NextRequest) => {
+    const contentLength = request.headers.get('content-length');
+    
+    if (contentLength && parseInt(contentLength) > maxSize) {
+      logger.warn('Request size exceeded limit', {
+        size: contentLength,
+        limit: maxSize,
+        path: request.nextUrl.pathname
+      });
+      
+      return NextResponse.json(
+        { error: 'Request entity too large' },
+        { status: 413 }
+      );
+    }
+    
+    return NextResponse.next();
+  };
+}
+
+// 组合所有安全中间件
+export function applySecurityMiddleware(request: NextRequest) {
+  // 按顺序应用中间件
+  const middlewares = [
+    () => httpsRedirectMiddleware(request),
+    () => securityHeadersMiddleware(request),
+    () => corsMiddleware(request),
+    () => rateLimitMiddleware(request),
+    () => csrfMiddleware(request),
+    () => requestSizeMiddleware()(request)
+  ];
+  
+  for (const middleware of middlewares) {
+    const result = middleware();
+    if (result.status !== 200) {
+      return result;
+    }
+  }
+  
+  return NextResponse.next();
+}

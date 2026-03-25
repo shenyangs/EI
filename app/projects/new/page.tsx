@@ -206,7 +206,7 @@ export default function NewProjectPage() {
 
           {error && (
             <div className="field field--full">
-              <div style={{ color: 'var(--rose)', margin: '8px 0' }}>
+              <div className="auth-error">
                 {error}
               </div>
             </div>
@@ -215,10 +215,9 @@ export default function NewProjectPage() {
           <div className="field field--full">
             <button 
               type="button" 
-              className="secondary-button" 
+              className="secondary-button button-spaced" 
               onClick={analyzeWithAi}
               disabled={isAnalyzing}
-              style={{ marginBottom: '10px' }}
             >
               {isAnalyzing ? "AI 分析中..." : "AI 分析我的想法"}
             </button>
@@ -244,9 +243,9 @@ export default function NewProjectPage() {
           <div className="stack-list">
             <div className="line-item line-item--column">
               <strong>AI 思考过程</strong>
-              <div style={{ backgroundColor: '#f5f5f5', padding: '12px', borderRadius: '8px', marginTop: '8px' }}>
+              <div className="ai-thinking">
                 <p>{aiAnalysis.thinking.thoughts}</p>
-                <div style={{ marginTop: '8px', fontSize: '14px', color: '#666' }}>
+                <div className="ai-thinking-meta">
                   <strong>置信度：</strong>{aiAnalysis.thinking.confidence}/100
                 </div>
               </div>
@@ -255,7 +254,7 @@ export default function NewProjectPage() {
             <div className="line-item line-item--column">
               <strong>研究主题分析</strong>
               <p>{aiAnalysis.content.content}</p>
-              <div style={{ marginTop: '8px', fontSize: '14px', color: '#666' }}>
+              <div className="ai-metadata">
                 <strong>字数：</strong>{aiAnalysis.content.metadata.wordCount} | 
                 <strong>阅读时间：</strong>{aiAnalysis.content.metadata.estimatedReadingTime}分钟 | 
                 <strong>主题：</strong>{aiAnalysis.content.metadata.topics.join(', ')}
@@ -264,28 +263,22 @@ export default function NewProjectPage() {
             
             <div className="line-item line-item--column">
               <strong>质量评估</strong>
-              <div style={{ backgroundColor: aiAnalysis.quality.approved ? '#e8f5e8' : '#ffebee', padding: '12px', borderRadius: '8px', marginBottom: '12px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div className={`ai-quality-assessment ${aiAnalysis.quality.approved ? 'approved' : 'needs-improvement'}`}>
+                <div className="ai-quality-header">
                   <strong>整体评分：</strong>{aiAnalysis.quality.overallScore}/100
-                  <span style={{ 
-                    padding: '4px 12px', 
-                    borderRadius: '16px', 
-                    backgroundColor: aiAnalysis.quality.approved ? '#4caf50' : '#f44336', 
-                    color: 'white', 
-                    fontSize: '14px' 
-                  }}>
+                  <span className={`ai-quality-status ${aiAnalysis.quality.approved ? 'approved' : 'needs-improvement'}`}>
                     {aiAnalysis.quality.approved ? '通过' : '需改进'}
                   </span>
                 </div>
               </div>
-              <div style={{ marginTop: '8px' }}>
+              <div className="ai-criteria-list">
                 {aiAnalysis.quality.criteria.map((criterion, index) => (
-                  <div key={index} style={{ marginBottom: '8px', padding: '8px', backgroundColor: '#f9f9f9', borderRadius: '4px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <div key={index} className="ai-criteria-item">
+                    <div className="ai-criteria-header">
                       <strong>{criterion.name}</strong>
                       <span>{criterion.score}/100</span>
                     </div>
-                    <p style={{ margin: '4px 0', fontSize: '14px' }}>{criterion.feedback}</p>
+                    <p className="ai-criteria-feedback">{criterion.feedback}</p>
                   </div>
                 ))}
               </div>
@@ -293,26 +286,28 @@ export default function NewProjectPage() {
             
             <div className="line-item line-item--column">
               <strong>改进建议</strong>
-              <ul style={{ margin: '8px 0' }}>
+              <ul className="ai-suggestions-list">
                 {aiAnalysis.quality.suggestions.map((suggestion, index) => (
-                  <li key={index} style={{ marginBottom: '8px', lineHeight: '1.4' }}>{suggestion}</li>
+                  <li key={index}>{suggestion}</li>
                 ))}
               </ul>
             </div>
             
             <div className="line-item line-item--column">
               <strong>提前预览：后续两步</strong>
-              {aiAnalysis.nextSteps.map((step, index) => (
-                <div key={index} style={{ marginBottom: '16px', padding: '12px', backgroundColor: '#f0f7ff', borderRadius: '8px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                    <strong>第 {index + 2} 步：{step.step}</strong>
-                    <span style={{ padding: '2px 8px', borderRadius: '12px', backgroundColor: '#e3f2fd', fontSize: '12px' }}>
-                      {step.estimatedTime}分钟
-                    </span>
+              <div className="ai-next-steps">
+                {aiAnalysis.nextSteps.map((step, index) => (
+                  <div key={index} className="ai-next-step-item">
+                    <div className="ai-next-step-header">
+                      <strong>第 {index + 2} 步：{step.step}</strong>
+                      <span className="ai-next-step-time">
+                        {step.estimatedTime}分钟
+                      </span>
+                    </div>
+                    <p className="ai-next-step-preview">{step.preview}</p>
                   </div>
-                  <p style={{ margin: '4px 0', lineHeight: '1.4' }}>{step.preview}</p>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           </div>
         </section>

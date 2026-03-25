@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { generatePaperDraft } from "@/lib/minimax-client";
+import { orchestrateAIRequest } from "@/lib/ai/ai-orchestrator";
 import {
   buildFallbackAdvisorBundle,
   parseAdvisorBundleFromModelOutput,
@@ -14,6 +14,7 @@ type ModuleOptionsRequestBody = {
   discipline?: string;
   venueId?: string;
   userNote?: string;
+  modelId?: number;
 };
 
 export async function POST(request: Request) {
@@ -44,11 +45,9 @@ export async function POST(request: Request) {
   const venue = getVenueProfileById(body.venueId);
 
   try {
-    const result = await generatePaperDraft({
-      temperature: 0.35,
-      systemPrompt:
-        "你是一个只输出 JSON 的 EI 论文工作台策划助手。你的任务不是直接写论文，而是给出 3 组可供选择的模块方案。不要输出 markdown，不要解释。",
-      prompt: `请为论文工作台生成 3 组“${body.moduleType}”模块方案，并严格输出 JSON。
+    const systemPrompt = "你是一个只输出 JSON 的 EI 论文工作台策划助手。你的任务不是直接写论文，而是给出 3 组可供选择的模块方案。不要输出 markdown，不要解释。";
+    
+    const prompt = `请为论文工作台生成 3 组"${body.moduleType}"模块方案，并严格输出 JSON。
 
 输出 JSON 格式：
 {
@@ -85,14 +84,24 @@ export async function POST(request: Request) {
 moduleType 含义提示：
 - methodology = 推荐方法组合
 - materials = 优先补哪些材料与证据
-- search = 先从哪些文献搜索角度切入`
+- search = 先从哪些文献搜索角度切入`;
+
+    const result = await orchestrateAIRequest({
+      taskType: 'strategy',
+      prompt,
+      systemPrompt,
+      temperature: 0.35,
+      geminiModelId: body.modelId,
+      enableFallback: true
     });
 
     const parsed = parseAdvisorBundleFromModelOutput(result.content, body.moduleType);
 
     return NextResponse.json({
       ok: true,
-      ...parsed
+      ...parsed,
+      model: result.model,
+      fallback: result.fallback
     });
   } catch {
     const fallback = buildFallbackAdvisorBundle({

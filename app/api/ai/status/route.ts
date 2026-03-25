@@ -2,28 +2,40 @@ import { NextResponse } from "next/server";
 
 import { requestTextWithCurl } from "@/lib/curl-transport";
 import { getAiCapabilitySnapshot } from "@/lib/ai-runtime";
-import { probeModelConnection } from "@/lib/minimax-client";
+import { getDefaultModel, probeModelConnection } from "@/lib/ai/ai-client";
+import { getDatabase } from "@/lib/server/db";
 
 export async function GET() {
   const snapshot = getAiCapabilitySnapshot();
-  const modelConnected = await probeModelConnection();
+  const defaultModel = await getDefaultModel();
+  const modelConnected = defaultModel ? await probeModelConnection(defaultModel) : false;
+  
+  // 检测Gemini模型状态
+  let geminiModel = null;
+  let geminiConnected = false;
+  try {
+    const db = await getDatabase();
+    const models = await db.all('SELECT * FROM ai_models WHERE provider = ?', ['google']);
+    if (models.length > 0) {
+      geminiModel = models[0];
+      geminiConnected = await probeModelConnection(geminiModel);
+    }
+  } catch (error) {
+    console.error('Failed to probe Gemini model:', error);
+  }
+  
   const webSearchConnected = snapshot.webSearchEnabled
     ? await probeWebSearchConnection()
     : false;
 
   return NextResponse.json({
     ok: true,
-    provider: snapshot.provider,
-    model: snapshot.model,
-    baseUrl: snapshot.baseUrl,
-    hasApiKey: snapshot.hasApiKey,
+    provider: defaultModel?.provider || snapshot.provider,
+    model: defaultModel?.model || snapshot.model,
+    hasApiKey: !!defaultModel?.apiKey || snapshot.hasApiKey,
     webSearchEnabled: snapshot.webSearchEnabled,
-    webSearchMode: snapshot.webSearchMode,
     canGeneratePaperDraft: modelConnected,
-    canUseWebSearch: webSearchConnected,
-    modelConnected,
-    webSearchConnected,
-    probedAt: new Date().toISOString()
+    canUseWebSearch: webSearchConnected
   });
 }
 

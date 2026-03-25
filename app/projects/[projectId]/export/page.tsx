@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { ExportPanel } from "@/components/export-panel";
 import { FullTextPreview } from "@/components/fulltext-preview";
 import { StatusBadge } from "@/components/status-badge";
 import { getProjectById } from "@/lib/demo-data";
@@ -132,6 +133,14 @@ export default async function ExportPage({
         keywords={project.fullText.keywords}
         projectId={project.id}
         projectTitle={project.title}
+        sections={project.fullText.sections}
+        venueProfile={venueProfile}
+      />
+
+      <ExportPanel
+        projectTitle={project.title}
+        abstract={project.fullText.abstract}
+        keywords={project.fullText.keywords}
         sections={project.fullText.sections}
         venueProfile={venueProfile}
       />

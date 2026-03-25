@@ -3,22 +3,23 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import { PaperTypeSelector } from "@/components/paper-type-selector";
 import { ProjectCard } from "@/components/project-card";
 import { getAiCapabilitySnapshot } from "@/lib/ai-runtime";
 import { projectCards } from "@/lib/demo-data";
+import type { PaperCategory } from "@/lib/paper-type-profiles";
 
 import type { ProjectCardItem } from "@/lib/demo-data";
 
 type Project = ProjectCardItem;
 
 export default function HomePage() {
+  const [selectedPaperType, setSelectedPaperType] = useState<PaperCategory>("ei-conference");
   const [ai, setAi] = useState({
     provider: "minimax" as const,
     model: "MiniMax-M2.7",
-    baseUrl: "https://api.minimaxi.com/v1",
     hasApiKey: false,
     webSearchEnabled: true,
-    webSearchMode: "minimax_mcp" as const,
     canGeneratePaperDraft: false,
     canUseWebSearch: false
   });
@@ -32,10 +33,8 @@ export default function HomePage() {
           setAi({
             provider: data.provider,
             model: data.model,
-            baseUrl: data.baseUrl,
             hasApiKey: data.hasApiKey,
             webSearchEnabled: data.webSearchEnabled,
-            webSearchMode: data.webSearchMode,
             canGeneratePaperDraft: data.canGeneratePaperDraft,
             canUseWebSearch: data.canUseWebSearch
           });
@@ -75,7 +74,6 @@ export default function HomePage() {
       <section className="hero-card hero-card--landing">
         <div className="hero-card__top">
           <span className="eyebrow">跨学科 EI 论文工作台</span>
-          <span className="hero-plaque">移动优先重构版</span>
         </div>
         <h1>先选，再看，再确认。把论文流程顺成一条线。</h1>
         <p>
@@ -103,6 +101,18 @@ export default function HomePage() {
             看完整示例流程
           </Link>
         </div>
+      </section>
+
+      <section className="content-card content-card--accent">
+        <div className="card-heading card-heading--stack">
+          <span className="eyebrow">选择论文类型</span>
+          <h2>你要创作什么类型的论文？</h2>
+          <p>选择论文类型后，AI会自动加载对应的格式要求、写作建议和使用引导，帮助你快速开始</p>
+        </div>
+        <PaperTypeSelector 
+          onTypeChange={setSelectedPaperType}
+          initialType={selectedPaperType}
+        />
       </section>
 
       <section className="project-page-grid">
@@ -138,11 +148,11 @@ export default function HomePage() {
             </div>
             <div className="capability-item">
               <span>联网能力</span>
-              <strong>{ai.canUseWebSearch ? "模型侧已开启" : "未开启"}</strong>
+              <strong>{ai.canUseWebSearch ? "已开启" : "未开启"}</strong>
             </div>
             <div className="capability-item">
               <span>当前状态</span>
-              <strong>{ai.hasApiKey ? "本地可试用" : "等待配置密钥"}</strong>
+              <strong>{ai.hasApiKey ? "可试用" : "准备中"}</strong>
             </div>
           </div>
         </section>

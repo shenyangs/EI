@@ -1,7 +1,26 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createProject } from "@/lib/server/project-db";
+import { authMiddleware, checkPermission } from "@/lib/server/auth-middleware";
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+  // 验证用户认证
+  const authResponse = await authMiddleware(request);
+  if (authResponse.status !== 200) {
+    return authResponse;
+  }
+
+  // 检查用户权限
+  const userType = authResponse.headers.get('X-User-Type');
+  if (!userType || !checkPermission(userType, 'project:create')) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "没有权限创建项目。"
+      },
+      { status: 403 }
+    );
+  }
+
   let body: {
     title: string;
     description?: string;
@@ -54,7 +73,25 @@ export async function POST(request: Request) {
   }
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  // 验证用户认证
+  const authResponse = await authMiddleware(request);
+  if (authResponse.status !== 200) {
+    return authResponse;
+  }
+
+  // 检查用户权限
+  const userType = authResponse.headers.get('X-User-Type');
+  if (!userType || !checkPermission(userType, 'project:read')) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "没有权限查看项目。"
+      },
+      { status: 403 }
+    );
+  }
+
   try {
     const { getProjects } = await import("@/lib/server/project-db");
     const projects = await getProjects();

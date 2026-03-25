@@ -8,8 +8,10 @@ type ConnectionLightsProps = {
 };
 
 type StatusResponse = {
-  modelConnected?: boolean;
-  webSearchConnected?: boolean;
+  canGeneratePaperDraft?: boolean;
+  canUseWebSearch?: boolean;
+  provider?: string;
+  model?: string;
 };
 
 export function ConnectionLights({
@@ -18,6 +20,10 @@ export function ConnectionLights({
 }: ConnectionLightsProps) {
   const [modelConnected, setModelConnected] = useState(initialModelConnected);
   const [webSearchConnected, setWebSearchConnected] = useState(initialWebSearchConnected);
+  const [modelInfo, setModelInfo] = useState<{ provider: string; model: string }>({
+    provider: "minimax",
+    model: "MiniMax-M2.7"
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -36,8 +42,12 @@ export function ConnectionLights({
           return;
         }
 
-        setModelConnected(Boolean(data.modelConnected));
-        setWebSearchConnected(Boolean(data.webSearchConnected));
+        setModelConnected(Boolean(data.canGeneratePaperDraft));
+        setWebSearchConnected(Boolean(data.canUseWebSearch));
+        setModelInfo({
+          provider: data.provider || "minimax",
+          model: data.model || "MiniMax-M2.7"
+        });
       } catch {
         if (cancelled) {
           return;
@@ -66,6 +76,9 @@ export function ConnectionLights({
           }
         />
         <span>AI 模型</span>
+        <span className="status-light__model">
+          {modelInfo.model}
+        </span>
       </div>
       <div className="status-light">
         <span

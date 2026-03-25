@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { generatePaperDraft } from "@/lib/minimax-client";
+import { orchestrateAIRequest } from "@/lib/ai/ai-orchestrator";
 import { countContentMetrics, parseJsonFromModelOutput } from "@/lib/quality-check";
 import { getVenueProfileById } from "@/lib/venue-profiles";
 
@@ -10,6 +10,7 @@ type CheckRequestBody = {
   target?: "chapter" | "fulltext" | "abstract";
   venueId?: string;
   chapterGoal?: string;
+  modelId?: number;
 };
 
 export async function POST(request: Request) {
@@ -42,11 +43,9 @@ export async function POST(request: Request) {
   const target = body.target ?? "chapter";
 
   try {
-    const review = await generatePaperDraft({
-      temperature: 0.1,
-      systemPrompt:
-        "你是一位严格但克制的 EI 会议论文审稿助手。你要检查 AI 生成内容是否达到投稿工作稿标准。只输出 JSON，不要解释，不要加 markdown。",
-      prompt: `请检查下面这段内容是否符合当前会议规则和学术写作要求，并严格输出 JSON。
+    const systemPrompt = "你是一位严格但克制的 EI 会议论文审稿助手。你要检查 AI 生成内容是否达到投稿工作稿标准。只输出 JSON，不要解释，不要加 markdown。";
+    
+    const prompt = `请检查下面这段内容是否符合当前会议规则和学术写作要求，并严格输出 JSON。
 
 输出 JSON 格式：
 {
@@ -82,7 +81,15 @@ export async function POST(request: Request) {
 - 段落数：${metrics.paragraphCount}
 
 待检查内容：
-${body.content}`
+${body.content}`;
+
+    const review = await orchestrateAIRequest({
+      taskType: 'review',
+      prompt,
+      systemPrompt,
+      temperature: 0.1,
+      geminiModelId: body.modelId,
+      enableFallback: true
     });
 
     const parsed = parseJsonFromModelOutput(review.content);
@@ -93,7 +100,9 @@ ${body.content}`
       summary: parsed.summary,
       checks: parsed.checks,
       rewritePriorities: parsed.rewritePriorities,
-      metrics
+      metrics,
+      model: review.model,
+      fallback: review.fallback
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "内容自检失败。";

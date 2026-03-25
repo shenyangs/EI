@@ -1,9 +1,3 @@
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
-
-const execFileAsync = promisify(execFile);
-const CURL_STATUS_MARKER = "__CURL_STATUS__";
-
 type CurlRequestInput = {
   url: string;
   method?: "GET" | "POST";
@@ -35,39 +29,27 @@ export async function requestTextWithCurl({
   body,
   timeoutSeconds = 20
 }: CurlRequestInput) {
-  const args = [
-    "-sS",
-    "-X",
-    method,
-    url,
-    "--connect-timeout",
-    String(timeoutSeconds),
-    "--max-time",
-    String(timeoutSeconds)
-  ];
+  // 在 Edge Runtime 中使用 fetch 代替 curl
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutSeconds * 1000);
 
-  Object.entries(headers).forEach(([key, value]) => {
-    args.push("-H", `${key}: ${value}`);
-  });
+  try {
+    const response = await fetch(url, {
+      method,
+      headers,
+      body,
+      signal: controller.signal
+    });
 
-  if (body) {
-    args.push("-d", body);
+    const text = await response.text();
+    clearTimeout(timeoutId);
+
+    return {
+      status: response.status,
+      text
+    };
+  } catch (error) {
+    clearTimeout(timeoutId);
+    throw error;
   }
-
-  args.push("-w", `\n${CURL_STATUS_MARKER}:%{http_code}`);
-
-  const { stdout, stderr } = await execFileAsync("curl", args, {
-    maxBuffer: 2 * 1024 * 1024
-  });
-
-  const statusMatch = stdout.match(new RegExp(`\\n${CURL_STATUS_MARKER}:(\\d+)$`));
-
-  if (!statusMatch) {
-    throw new Error(stderr?.trim() || "curl 未返回 HTTP 状态码。");
-  }
-
-  return {
-    status: Number(statusMatch[1]),
-    text: stdout.replace(new RegExp(`\\n${CURL_STATUS_MARKER}:\\d+$`), "")
-  };
 }

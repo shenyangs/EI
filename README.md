@@ -1,68 +1,137 @@
-# 跨学科时尚与设计 EI 论文工作台
+# 跨学科 EI 论文工作台
 
-这是一个面向服装服饰设计、艺术、时尚、人文、社科、技术及交叉学科的 EI 论文工作台前端原型。
+一个面向服装、设计、时尚、人文社科与技术交叉研究的 EI 会议论文生成与规范化工作台。
 
-## 当前已完成
+## 项目简介
 
-- `Next.js + TypeScript` 前端骨架
-- 项目首页
-- 新建论文项目页
-- 项目概览页
-- 研究画像页
-- 论文提纲页
-- 章节写作页
-- 检查与导出页
-- 全局样式和演示数据
-- `MiniMax / 联网搜索` 配置骨架
-- 服务端 AI API 骨架
+本项目旨在帮助研究人员更高效地生成符合 EI 会议要求的论文，特别是针对跨学科研究领域。系统提供了从主题选择、大纲生成、章节写作到格式导出的完整工作流程。
 
-## 目录说明
+## 核心功能
 
-- `app/`
-  页面和全局样式
-- `components/`
-  可复用界面组件
-- `lib/demo-data.ts`
-  演示项目数据
-- `docs/plans/`
-  前面的架构、产品和页面设计文档
+- **智能主题方向生成**：基于用户输入的主题，生成具体的研究方向建议
+- **分阶段论文写作**：按章节生成内容，支持逐章修改和确认
+- **会议规则适配**：根据目标会议的要求自动调整论文格式和结构
+- **质量检查**：从学术性、逻辑性、完整性等多个维度评估论文质量
+- **多格式导出**：支持导出 LaTeX、DOCX 和 PDF 格式
+- **参考文献管理**：支持 BibTeX 导入和管理
 
-## 下一步建议
+## 技术栈
 
-1. 安装依赖
-2. 本地启动页面
-3. 接主写作模型
-4. 接联网搜索工具层
-5. 再继续接数据库和接口
+- **前端**：Next.js 15, React 19, TypeScript
+- **后端**：Next.js API 路由
+- **AI 集成**：支持多种 AI 模型（Minimax, Google Gemini）
+- **数据库**：SQLite（开发环境）
+- **样式**：CSS3（自定义变量和响应式设计）
 
-## 联网能力现状
+## 快速开始
 
-- 现在还没有真正联网搜索
-- 目前只是把配置骨架预留好了
-- 参考配置在 `.env.example`
-- 运行时读取逻辑在 `lib/ai-runtime.ts`
-- 服务端状态接口在 `app/api/ai/status/route.ts`
-- 服务端草稿生成接口在 `app/api/ai/draft/route.ts`
+### 环境要求
 
-## 本地 TLS 说明
+- Node.js 18.0 或更高版本
+- npm 或 yarn 包管理器
 
-如果你本机的 Node HTTPS 环境报 `SELF_SIGNED_CERT_IN_CHAIN`，可以只在本地验证时使用：
+### 安装步骤
 
-- `npm run dev:local-insecure-tls`
-- `npm run start:local-insecure-tls`
+1. 克隆项目
 
-这两个脚本只对当前进程关闭 TLS 严格校验，不会修改系统全局配置。
+```bash
+git clone https://github.com/yourusername/ei-fashion-workbench.git
+cd ei-fashion-workbench
+```
 
-## 密钥提醒
+2. 安装依赖
 
-- 不要把真实 API Key 写进代码仓库
-- 建议只放在本地 `.env.local`
-- 如果真实密钥已经发到聊天里，建议立刻旋转
+```bash
+npm install
+```
 
-## 计划中的下一阶段
+3. 配置环境变量
 
-- 数据库表结构
-- API 设计
-- 参考文献与图文材料页
-- 真实项目创建流程
-- 导出与检查逻辑接入
+复制 `.env.example` 文件并重命名为 `.env`，然后填写相应的环境变量：
+
+```bash
+cp .env.example .env
+```
+
+4. 启动开发服务器
+
+```bash
+npm run dev
+```
+
+5. 访问应用
+
+打开浏览器访问 `http://localhost:3000`
+
+## 项目结构
+
+```
+├── app/                # Next.js 应用目录
+│   ├── api/            # API 路由
+│   ├── admin/          # 管理界面
+│   ├── login/          # 登录页面
+│   ├── profile/        # 用户个人资料
+│   ├── projects/       # 项目管理
+│   └── register/       # 注册页面
+├── components/         # 可复用组件
+├── docs/               # 文档目录
+│   └── plans/          # 设计规划文档
+├── lib/                # 核心库
+│   ├── ai/             # AI 相关功能
+│   ├── server/         # 服务器端功能
+│   └── *.ts            # 通用工具函数
+├── __tests__/          # 测试文件
+├── .env.example        # 环境变量示例
+├── next.config.ts      # Next.js 配置
+├── package.json        # 项目配置和依赖
+└── tsconfig.json       # TypeScript 配置
+```
+
+## 使用指南
+
+### 1. 新建论文项目
+
+- 访问 `/projects/new` 页面
+- 输入研究主题、关键词和目标会议
+- 选择论文类型
+
+### 2. 生成论文大纲
+
+- 系统会根据主题自动生成论文大纲
+- 您可以调整大纲结构和内容
+
+### 3. 逐章写作
+
+- 进入 `/projects/[projectId]/writing` 页面
+- 选择章节进行写作
+- AI 会辅助生成章节内容
+- 您可以编辑和确认每章内容
+
+### 4. 质量检查
+
+- 系统会自动检查论文质量
+- 提供改进建议
+
+### 5. 格式导出
+
+- 进入 `/projects/[projectId]/export` 页面
+- 选择导出格式（LaTeX、DOCX、PDF）
+- 下载导出文件
+
+## 贡献指南
+
+1. Fork 项目
+2. 创建功能分支 (`git checkout -b feature/AmazingFeature`)
+3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
+4. 推送到分支 (`git push origin feature/AmazingFeature`)
+5. 打开 Pull Request
+
+## 许可证
+
+本项目采用 MIT 许可证 - 详见 LICENSE 文件
+
+## 联系方式
+
+- 项目维护者：[Your Name]
+- 邮箱：[your.email@example.com]
+- 项目链接：[https://github.com/yourusername/ei-fashion-workbench](https://github.com/yourusername/ei-fashion-workbench)
