@@ -2490,9 +2490,110 @@ textarea:focus {
     padding: 10px;
     border: 1px solid rgba(20, 33, 61, 0.08);
     border-radius: 22px;
-    background: rgba(255, 255, 255, 0.9);
+    background: rgba(255, 255, 255, 0.95);
     box-shadow: 0 14px 36px rgba(31, 45, 85, 0.14);
-    backdrop-filter: blur(18px);
+    backdrop-filter: blur(20px);
+    transition: all 0.3s ease;
+  }
+
+  .mobile-project-dock:hover {
+    box-shadow: 0 18px 40px rgba(31, 45, 85, 0.18);
+    transform: translateX(-50%) translateY(-2px);
+  }
+
+  /* 优化移动端的按钮样式 */
+  .primary-button,
+  .secondary-button {
+    min-height: 48px;
+    font-size: 0.98rem;
+    font-weight: 700;
+  }
+
+  /* 优化移动端的输入框样式 */
+  input,
+  textarea {
+    padding: 16px 16px;
+    font-size: 0.96rem;
+  }
+
+  /* 优化移动端的卡片样式 */
+  .content-card,
+  .hero-card,
+  .form-card {
+    padding: 20px;
+  }
+
+  /* 优化移动端的章节选择 */
+  .chapter-menu--carousel {
+    gap: 12px;
+  }
+
+  .chapter-menu__item {
+    padding: 16px;
+  }
+
+  /* 优化移动端的大纲编辑 */
+  .outline-item {
+    padding: 16px;
+  }
+
+  /* 优化移动端的提示信息 */
+  .hint-panel {
+    padding: 16px;
+  }
+
+  /* 优化移动端的按钮行 */
+  .button-row {
+    gap: 12px;
+  }
+
+  /* 优化移动端的栈列表 */
+  .stack-list {
+    gap: 12px;
+  }
+
+  /* 优化移动端的行项目 */
+  .line-item {
+    padding: 16px;
+  }
+
+  /* 优化移动端的选择卡片 */
+  .choice-card {
+    padding: 16px;
+  }
+
+  /* 优化移动端的标题样式 */
+  h1 {
+    font-size: clamp(1.8rem, 6vw, 2.5rem);
+  }
+
+  h2 {
+    font-size: clamp(1.4rem, 4vw, 1.8rem);
+  }
+
+  h3 {
+    font-size: clamp(1.1rem, 3vw, 1.4rem);
+  }
+
+  /* 优化移动端的段落样式 */
+  p {
+    font-size: 0.96rem;
+    line-height: 1.65;
+  }
+
+  /* 优化移动端的加载状态 */
+  .loading-spinner {
+    display: inline-block;
+    width: 24px;
+    height: 24px;
+    border: 3px solid rgba(43, 102, 245, 0.1);
+    border-radius: 50%;
+    border-top-color: #2b66f5;
+    animation: spin 1s ease-in-out infinite;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
   }
 }
 

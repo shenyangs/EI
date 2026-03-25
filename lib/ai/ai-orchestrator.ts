@@ -139,7 +139,15 @@ ${Object.entries(context.userInputs).map(([key, value]) => `${key}: ${value}`).j
       ?.map(topic => topic.toLowerCase()) || [];
 
     // 解析5个研究方向
-    const directions = [];
+    const directions: Array<{
+      id: string;
+      label: string;
+      description: string;
+      confidence: number;
+      whyItFits: string[];
+      writingStrategy: string[];
+      readyOutputs: string[];
+    }> = [];
     if (taskType === 'project_initialization' || taskType === 'topic_analysis') {
       const directionMatches = content.match(/## 方向\d[\s\S]*?(?=## 方向\d|$)/g);
       if (directionMatches) {
@@ -185,11 +193,22 @@ ${Object.entries(context.userInputs).map(([key, value]) => `${key}: ${value}`).j
   }
 
   private static async checkQuality(content: string, taskType: AiTaskType, context: AiTaskContext): Promise<AiQualityCheckResult> {
-    const systemPrompt = `你是一个严格的EI论文质量评审专家，专门评估学术论文的质量。你的任务是：
-1. 从多个维度评估内容质量
-2. 给出具体的分数和反馈
-3. 提供改进建议
-4. 判断内容是否达到博士生导师评审的标准
+    const systemPrompt = `你是一个严格的博士生导师，专门评估学术论文的质量。你的评估标准非常高，只有达到博士论文水平的内容才能通过你的评审。你的任务是：
+1. 从多个维度严格评估内容质量
+2. 给出具体的分数和详细反馈
+3. 提供针对性的改进建议
+4. 判断内容是否达到博士生导师评审的高标准
+
+评估维度包括但不限于：
+- 学术性：是否符合EI会议的学术标准，是否有扎实的理论基础
+- 原创性：是否有新颖的观点和方法
+- 完整性：内容是否全面，覆盖所有必要的方面
+- 逻辑结构：结构是否清晰，逻辑是否严谨
+- 论证深度：分析是否深入，论证是否充分
+- 方法论：研究方法是否科学合理
+- 数据分析：数据处理和分析是否严谨
+- 语言表达：语言是否规范，表达是否清晰准确
+- 会议适配度：是否符合目标会议的要求和风格
 
 请按照以下格式输出：
 
@@ -198,22 +217,24 @@ ${Object.entries(context.userInputs).map(([key, value]) => `${key}: ${value}`).j
 
 ## 评估维度
 [维度1]: [分数]/100
-[反馈]
+[详细反馈]
 
 [维度2]: [分数]/100
-[反馈]
+[详细反馈]
 
 ...
 
 ## 改进建议
-1. [建议1]
-2. [建议2]
-3. [建议3]
+1. [具体建议1]
+2. [具体建议2]
+3. [具体建议3]
+4. [具体建议4]
+5. [具体建议5]
 
 ## 质量结论
 [Approved/Rejected]`;
 
-    const userPrompt = `请评估以下内容的质量，任务类型：${taskType}
+    const userPrompt = `请严格评估以下内容的质量，任务类型：${taskType}
 
 项目信息：
 - 项目ID：${context.projectId}
@@ -223,12 +244,12 @@ ${Object.entries(context.userInputs).map(([key, value]) => `${key}: ${value}`).j
 内容：
 ${content}
 
-请从学术性、完整性、逻辑结构、论证深度、语言表达等维度进行评估。`;
+请从学术性、原创性、完整性、逻辑结构、论证深度、方法论、数据分析、语言表达、会议适配度等维度进行严格评估，确保达到博士生导师评审的高标准。`;
 
     const result = await generatePaperDraft({
       prompt: userPrompt,
       systemPrompt,
-      temperature: 0.3
+      temperature: 0.2
     });
 
     // 解析质量检查结果
@@ -249,11 +270,15 @@ ${content}
 
     const suggestions = suggestionsMatches ? suggestionsMatches[1].trim().split(/\n\d+\. /).filter(Boolean) : [];
 
+    // 增强质量检查的严格性
+    const overallScore = scoreMatch ? parseInt(scoreMatch[1], 10) : 0;
+    const approved = (approvedMatch ? approvedMatch[1] === 'Approved' : false) && overallScore >= 80;
+
     return {
-      overallScore: scoreMatch ? parseInt(scoreMatch[1], 10) : 0,
+      overallScore,
       criteria,
       suggestions,
-      approved: approvedMatch ? approvedMatch[1] === 'Approved' : false
+      approved
     };
   }
 

@@ -180,14 +180,24 @@ export function getVenueProfileById(venueId?: string | null) {
   return venueProfiles.find((item) => item.id === venueId) ?? venueProfiles[1];
 }
 
-export function buildVenueHref(href: string, venueId?: string | null) {
-  if (!venueId) {
-    return href;
-  }
-
+export function buildVenueHref(href: string, venueId?: string | null, params?: Record<string, string>) {
   const [baseHref, hash] = href.split("#", 2);
+  let queryParams = [];
+  
+  if (venueId) {
+    queryParams.push(`venue=${venueId}`);
+  }
+  
+  if (params) {
+    Object.entries(params).forEach(([key, value]) => {
+      if (value) {
+        queryParams.push(`${key}=${encodeURIComponent(value)}`);
+      }
+    });
+  }
+  
   const separator = baseHref.includes("?") ? "&" : "?";
-  const hrefWithVenue = `${baseHref}${separator}venue=${venueId}`;
+  const hrefWithParams = queryParams.length > 0 ? `${baseHref}${separator}${queryParams.join("&")}` : baseHref;
 
-  return hash ? `${hrefWithVenue}#${hash}` : hrefWithVenue;
+  return hash ? `${hrefWithParams}#${hash}` : hrefWithParams;
 }

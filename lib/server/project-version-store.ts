@@ -12,7 +12,7 @@ export async function listProjectVersions(projectId: string, key?: string) {
     : 'SELECT * FROM project_versions WHERE projectId = ? ORDER BY createdAt DESC';
   const params = key ? [projectId, key] : [projectId];
 
-  const versions = await db.all<any[]>(query, params);
+  const versions = await db.all(query, params);
   return versions.map(v => ({
     id: v.id.toString(),
     projectId: v.projectId,
@@ -32,7 +32,7 @@ export async function createProjectVersion<TPayload extends ProjectVersionPayloa
   const db = await getDatabase();
   
   // 检查是否已存在相同的版本
-  const existing = await db.get<any>(
+  const existing = await db.get(
     'SELECT * FROM project_versions WHERE projectId = ? AND key = ? AND fingerprint = ?',
     [projectId, input.key, input.fingerprint]
   );

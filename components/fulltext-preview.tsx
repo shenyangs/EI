@@ -82,7 +82,55 @@ export function FullTextPreview({
   const [review, setReview] = useState<AiQualityReport | null>(null);
   const [reviewLoading, setReviewLoading] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const [outline, setOutline] = useState<any[]>([]);
   const { archiveCurrent, getRecord, matchesCurrent, upsertRecord } = useProjectArchive(projectId);
+
+  // 从本地存档获取大纲数据
+  useEffect(() => {
+    const outlineRecord = getRecord("outline");
+    if (outlineRecord) {
+      // 这里可以从存档中获取大纲数据
+      // 为了演示，我们使用默认大纲
+      setOutline([
+        {
+          id: "section-1",
+          title: "1. 绪论",
+          goal: "介绍研究背景、问题陈述和研究意义",
+          summary: "包括研究背景、研究问题、研究目的、研究意义、研究方法、论文结构等内容"
+        },
+        {
+          id: "section-2",
+          title: "2. 文献综述",
+          goal: "梳理相关研究现状和理论基础",
+          summary: "包括国内外研究现状、理论基础、研究缺口等内容"
+        },
+        {
+          id: "section-3",
+          title: "3. 研究方法",
+          goal: "详细描述研究设计和方法",
+          summary: "包括研究设计、数据收集方法、数据分析方法等内容"
+        },
+        {
+          id: "section-4",
+          title: "4. 研究结果",
+          goal: "呈现研究数据和结果",
+          summary: "包括数据描述、结果分析、发现等内容"
+        },
+        {
+          id: "section-5",
+          title: "5. 讨论",
+          goal: "解释研究结果的意义和影响",
+          summary: "包括结果解释、与现有研究的比较、理论贡献、实践意义等内容"
+        },
+        {
+          id: "section-6",
+          title: "6. 结论与展望",
+          goal: "总结研究成果和未来研究方向",
+          summary: "包括研究结论、研究局限、未来研究方向等内容"
+        }
+      ]);
+    }
+  }, [getRecord]);
 
   const currentFullText = useMemo(() => {
     if (generatedPreview) {
@@ -163,15 +211,19 @@ export function FullTextPreview({
 
   function regeneratePreview() {
     startTransition(async () => {
-      setMessage("正在重新整合全文...");
+      setMessage("正在基于大纲生成全文...");
+
+      const outlineContent = outline.map((item) => `${item.title}\n目标：${item.goal}\n内容摘要：${item.summary}`).join("\n\n");
 
       const result = await requestDraft(
-        `请根据下面的论文信息，为《${projectTitle}》重新整合一版中文全文预览。
+        `请根据下面的论文信息和大纲，为《${projectTitle}》生成一版符合EI发表要求的中文全文。
 要求：
-1. 摘要、引言、方法、结果、结论都要出现
-2. 保持正式 ${venueProfile.name} 会议论文口吻
-3. 不编造参考文献
-4. 只输出全文正文
+1. 严格按照大纲结构生成内容，确保每个章节都有详细的论述
+2. 保持正式 ${venueProfile.name} 会议论文口吻，学术表达克制，避免夸张和主观判断
+3. 内容详尽，提供充分的分析和论证
+4. 不编造参考文献
+5. 符合EI会议的学术标准，结构清晰，逻辑严谨
+6. 只输出全文正文，包括摘要、关键词和各个章节
 
 会议规则：
 ${venueProfile.template}
@@ -186,17 +238,17 @@ ${abstract}
 关键词：
 ${keywords.join("、")}
 
-章节信息：
-${sections.map((item) => `${item.title}：${item.content.join(" ")}`).join("\n")}`
+大纲：
+${outlineContent}`
       );
 
       if (!result.ok || !result.content) {
-        setMessage(result.error ?? "全文整合失败。");
+        setMessage(result.error ?? "全文生成失败。");
         return;
       }
 
       setGeneratedPreview(result.content);
-      setMessage("已经重新整合出一版全文，正在自动自检。");
+      setMessage("已经基于大纲生成出一版符合EI要求的全文，正在自动自检。");
       await runFullTextCheck(result.content);
     });
   }

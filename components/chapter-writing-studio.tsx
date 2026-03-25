@@ -285,14 +285,15 @@ export function ChapterWritingStudio({
       }
 
       // 更新内容
-      const nextParagraphs = result.content
+      const content = result.content || "";
+      const nextParagraphs = content
         .split(/\n{2,}/)
         .map((item) => item.trim())
         .filter(Boolean);
 
       setDraftMap((current) => ({
         ...current,
-        [chapterId]: nextParagraphs.length > 0 ? nextParagraphs : [result.content]
+        [chapterId]: nextParagraphs.length > 0 ? nextParagraphs : [content]
       }));
 
       setMessage(`AI 已完成对“${chapter.title}”的内容生成。`);
@@ -344,56 +345,37 @@ export function ChapterWritingStudio({
     startTransition(async () => {
       setMessage(`正在重写“${activeChapter.title}”...`);
 
-      try {
-        const context: AiTaskContext = {
-          projectId,
-          projectTitle,
-          venueId: venueProfile.id,
-          currentStep: "chapter_writing",
-          previousSteps: [],
-          userInputs: {
-            chapterId: activeChapter.id,
-            chapterTitle: activeChapter.title,
-            chapterGoal: activeChapter.goal,
-            chapterSummary: activeChapter.summary,
-            currentContent: (draftMap[activeChapter.id] ?? activeChapter.paragraphs).join("\n\n"),
-            regenerate: true
-          }
-        };
+      const result = await requestDraft(
+        `请为论文《${projectTitle}》的“${activeChapter.title}”章节生成 3 段正式草稿。
+要求：
+1. 保留章节目标：${activeChapter.goal}
+2. 结合当前章节摘要：${activeChapter.summary}
+3. 语气像 ${venueProfile.name} 对应的会议论文，不要空泛
+4. 不编造参考文献
+5. 只输出正文内容`
+      );
 
-        const result = await AiOrchestrator.runTask("chapter_writing", context);
-        
-        // 更新内容
-        const nextParagraphs = result.content.content
-          .split(/\n{2,}/)
-          .map((item) => item.trim())
-          .filter(Boolean);
-
-        setDraftMap((current) => ({
-          ...current,
-          [activeChapter.id]: nextParagraphs.length > 0 ? nextParagraphs : [result.content.content]
-        }));
-
-        // 生成改稿意见
-        const revisionSuggestions = await AiOrchestrator.generateRevisionSuggestions(
-          result.content.content,
-          result.quality,
-          context
-        );
-
-        setAiAnalysisMap((current) => ({
-          ...current,
-          [activeChapter.id]: {
-            ...result,
-            revisionSuggestions
-          }
-        }));
-
-        setMessage(`“${activeChapter.title}”已经重写完成，AI 已完成深度分析。`);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : "重写失败，请稍后再试。";
-        setMessage(message);
+      if (!result.ok || !result.content) {
+        setMessage(result.error ?? "重写失败，请稍后再试。");
+        return;
       }
+
+      const nextParagraphs = result.content
+        .split(/\n{2,}/)
+        .map((item) => item.trim())
+        .filter(Boolean);
+
+      setDraftMap((current) => ({
+        ...current,
+        [activeChapter.id]: nextParagraphs.length > 0 ? nextParagraphs : [result.content!]
+      }));
+      setMessage(`“${activeChapter.title}”已经重写完成，正在自动自检。`);
+      await runChapterCheck(
+        activeChapter.id,
+        nextParagraphs.length > 0 ? nextParagraphs : [result.content!],
+        activeChapter.goal,
+        activeChapter.title
+      );
     });
   }
 
@@ -407,51 +389,31 @@ export function ChapterWritingStudio({
       setMessage(`正在按你的要求修改“${activeChapter.title}”...`);
 
       try {
-        const context: AiTaskContext = {
-          projectId,
-          projectTitle,
-          venueId: venueProfile.id,
-          currentStep: "chapter_writing",
-          previousSteps: [],
-          userInputs: {
-            chapterId: activeChapter.id,
-            chapterTitle: activeChapter.title,
-            chapterGoal: activeChapter.goal,
-            chapterSummary: activeChapter.summary,
-            currentContent: activeParagraphs.join("\n\n"),
-            customInstruction: customInstruction
-          }
-        };
+        const result = await requestDraft(
+          `请按照以下要求修改论文《${projectTitle}》的“${activeChapter.title}”章节：\n${customInstruction}\n\n当前章节内容：\n${activeParagraphs.join("\n\n")}\n\n要求：\n1. 保留章节目标：${activeChapter.goal}\n2. 结合当前章节摘要：${activeChapter.summary}\n3. 语气像 ${venueProfile.name} 对应的会议论文，不要空泛\n4. 不编造参考文献\n5. 只输出修改后的正文内容`
+        );
 
-        const result = await AiOrchestrator.runTask("revision_suggestions", context);
-        
-        // 更新内容
-        const nextParagraphs = result.content.content
+        if (!result.ok || !result.content) {
+          setMessage(result.error ?? "修改失败，请稍后再试。");
+          return;
+        }
+
+        const nextParagraphs = result.content
           .split(/\n{2,}/)
           .map((item) => item.trim())
           .filter(Boolean);
 
         setDraftMap((current) => ({
           ...current,
-          [activeChapter.id]: nextParagraphs.length > 0 ? nextParagraphs : [result.content.content]
+          [activeChapter.id]: nextParagraphs.length > 0 ? nextParagraphs : [result.content!]
         }));
-
-        // 生成改稿意见
-        const revisionSuggestions = await AiOrchestrator.generateRevisionSuggestions(
-          result.content.content,
-          result.quality,
-          context
+        setMessage(`“${activeChapter.title}”已经按你的要求修改完成，正在自动自检。`);
+        await runChapterCheck(
+          activeChapter.id,
+          nextParagraphs.length > 0 ? nextParagraphs : [result.content!],
+          activeChapter.goal,
+          activeChapter.title
         );
-
-        setAiAnalysisMap((current) => ({
-          ...current,
-          [activeChapter.id]: {
-            ...result,
-            revisionSuggestions
-          }
-        }));
-
-        setMessage("已经按你的要求更新当前章节，AI 已完成深度分析。");
       } catch (error) {
         const message = error instanceof Error ? error.message : "按要求修改失败。";
         setMessage(message);
@@ -614,6 +576,103 @@ export function ChapterWritingStudio({
           ))}
         </div>
       </section>
+
+      {aiAnalysisMap[activeChapter.id] && (
+        <section className="content-card">
+          <div className="card-heading card-heading--stack">
+            <span className="eyebrow">AI 深度分析</span>
+            <h3>AI 对本章的分析和建议</h3>
+            <p>AI 已完成深度思考、内容生成、质量检查和下一步预测。</p>
+          </div>
+          
+          <div className="stack-list">
+            <div className="line-item line-item--column">
+              <strong>AI 思考过程</strong>
+              <div style={{ backgroundColor: '#f5f5f5', padding: '12px', borderRadius: '8px', marginTop: '8px' }}>
+                <p>{aiAnalysisMap[activeChapter.id].thinking.thoughts}</p>
+                <div style={{ marginTop: '8px', fontSize: '14px', color: '#666' }}>
+                  <strong>置信度：</strong>{aiAnalysisMap[activeChapter.id].thinking.confidence}/100
+                </div>
+              </div>
+            </div>
+            
+            <div className="line-item line-item--column">
+              <strong>质量评估</strong>
+              <div style={{ backgroundColor: aiAnalysisMap[activeChapter.id].quality.approved ? '#e8f5e8' : '#ffebee', padding: '12px', borderRadius: '8px', marginBottom: '12px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <strong>整体评分：</strong>{aiAnalysisMap[activeChapter.id].quality.overallScore}/100
+                  <span style={{ 
+                    padding: '4px 12px', 
+                    borderRadius: '16px', 
+                    backgroundColor: aiAnalysisMap[activeChapter.id].quality.approved ? '#4caf50' : '#f44336', 
+                    color: 'white', 
+                    fontSize: '14px' 
+                  }}>
+                    {aiAnalysisMap[activeChapter.id].quality.approved ? '通过' : '需改进'}
+                  </span>
+                </div>
+              </div>
+              <div style={{ marginTop: '8px' }}>
+                {aiAnalysisMap[activeChapter.id].quality.criteria.map((criterion: any, index: number) => (
+                  <div key={index} style={{ marginBottom: '8px', padding: '8px', backgroundColor: '#f9f9f9', borderRadius: '4px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <strong>{criterion.name}</strong>
+                      <span>{criterion.score}/100</span>
+                    </div>
+                    <p style={{ margin: '4px 0', fontSize: '14px' }}>{criterion.feedback}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+            
+            <div className="line-item line-item--column">
+              <strong>改进建议</strong>
+              <ul style={{ margin: '8px 0' }}>
+                {aiAnalysisMap[activeChapter.id].quality.suggestions.map((suggestion: string, index: number) => (
+                  <li key={index} style={{ marginBottom: '8px', lineHeight: '1.4' }}>{suggestion}</li>
+                ))}
+              </ul>
+            </div>
+            
+            <div className="line-item line-item--column">
+              <strong>改稿意见</strong>
+              {aiAnalysisMap[activeChapter.id].revisionSuggestions && aiAnalysisMap[activeChapter.id].revisionSuggestions.map((suggestion: any, index: number) => (
+                <div key={index} style={{ marginBottom: '12px', padding: '12px', backgroundColor: suggestion.severity === 'high' ? '#ffebee' : suggestion.severity === 'medium' ? '#fff3e0' : '#e8f5e8', borderRadius: '8px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <strong>{suggestion.section}</strong>
+                    <span style={{ 
+                      padding: '2px 8px', 
+                      borderRadius: '12px', 
+                      backgroundColor: suggestion.severity === 'high' ? '#f44336' : suggestion.severity === 'medium' ? '#ff9800' : '#4caf50', 
+                      color: 'white', 
+                      fontSize: '12px' 
+                    }}>
+                      {suggestion.severity === 'high' ? '高' : suggestion.severity === 'medium' ? '中' : '低'}
+                    </span>
+                  </div>
+                  <p style={{ margin: '4px 0', fontSize: '14px', fontWeight: 'bold' }}>{suggestion.issue}</p>
+                  <p style={{ margin: '4px 0', lineHeight: '1.4' }}>{suggestion.suggestion}</p>
+                </div>
+              ))}
+            </div>
+            
+            <div className="line-item line-item--column">
+              <strong>提前预览：后续两步</strong>
+              {aiAnalysisMap[activeChapter.id].nextSteps.map((step: any, index: number) => (
+                <div key={index} style={{ marginBottom: '16px', padding: '12px', backgroundColor: '#f0f7ff', borderRadius: '8px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <strong>第 {index + 2} 步：{step.step}</strong>
+                    <span style={{ padding: '2px 8px', borderRadius: '12px', backgroundColor: '#e3f2fd', fontSize: '12px' }}>
+                      {step.estimatedTime}分钟
+                    </span>
+                  </div>
+                  <p style={{ margin: '4px 0', lineHeight: '1.4' }}>{step.preview}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       <section className="content-card content-card--soft anchor-section" id="chapter-instruction">
         <div className="card-heading card-heading--stack">

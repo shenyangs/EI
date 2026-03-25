@@ -16,16 +16,6 @@ import { useProjectVersionHistory } from "@/lib/project-version-client";
 import type { TopicDirectionVersionPayload } from "@/lib/project-version-types";
 import { buildVenueHref } from "@/lib/venue-profiles";
 
-type TopicTypeOption = {
-  id: string;
-  label: string;
-  description: string;
-  confidence: string;
-  whyItFits: string[];
-  writingStrategy: string[];
-  readyOutputs: string[];
-};
-
 type TopicDirectionSelectorProps = {
   projectId: string;
   options?: TopicTypeOption[];
@@ -174,9 +164,12 @@ export function TopicDirectionSelector({
             <span className="eyebrow">第二步</span>
             <h3>AI 正在分析您的研究主题，生成详细方向...</h3>
           </div>
-          <p className="lead-text">
-            系统正在根据您的研究主题生成5个详细的研究方向，请稍候...
-          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 0' }}>
+            <div className="loading-spinner"></div>
+            <p className="lead-text" style={{ marginTop: '20px', textAlign: 'center' }}>
+              系统正在根据您的研究主题生成5个详细的研究方向，请稍候...
+            </p>
+          </div>
         </section>
       </div>
     );
@@ -379,7 +372,11 @@ export function TopicDirectionSelector({
           isReady && isCurrentArchived ? (
             <Link
               className="primary-button"
-              href={buildVenueHref(`/projects/${projectId}/outline`, venueId)}
+              href={buildVenueHref(`/projects/${projectId}/outline`, venueId, {
+                direction: selected.label,
+                directionId: selected.id,
+                title: projectTitle || ""
+              })}
             >
               用这份已存档方向生成论文框架
             </Link>

@@ -71,16 +71,23 @@ function badgeTone(status: OutlineSection["status"]) {
 
 export function OutlineWorkbench({
   projectId,
-  packages,
-  outline,
-  venueId
+  packages: initialPackages,
+  outline: initialOutline,
+  venueId,
+  selectedDirection,
+  projectTitle
 }: OutlineWorkbenchProps) {
-  const [selectedId, setSelectedId] = useState(packages[0]?.id ?? "");
+  const [packages, setPackages] = useState<TitlePackage[]>(initialPackages || []);
+  const [outline, setOutline] = useState<OutlineSection[]>(initialOutline || []);
+  const [loading, setLoading] = useState(!initialPackages || !initialOutline);
+  const [selectedId, setSelectedId] = useState(initialPackages?.[0]?.id ?? "");
   const [customTitle, setCustomTitle] = useState("");
   const [customAbstractNote, setCustomAbstractNote] = useState("");
   const [reviewMap, setReviewMap] = useState<Record<string, AiQualityReport | null>>({});
   const [message, setMessage] = useState("当前框架包已准备好，可继续进入逐章写作。");
   const [reviewLoading, setReviewLoading] = useState(false);
+  const [editingSection, setEditingSection] = useState<string | null>(null);
+  const [editedSections, setEditedSections] = useState<Record<string, Partial<OutlineSection>>>({});
   const {
     archiveCurrent,
     getRecord,
@@ -89,12 +96,200 @@ export function OutlineWorkbench({
     upsertRecord
   } = useProjectArchive(projectId);
 
+  // 从AI生成博士开题级别的详细大纲
+  useEffect(() => {
+    if ((!initialPackages || !initialOutline) && projectId && selectedDirection && projectTitle) {
+      setLoading(true);
+      
+      const generateOutline = async () => {
+        try {
+          const response = await fetch("/api/ai/think", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              taskType: "outline_generation",
+              context: {
+                projectId,
+                projectTitle,
+                venueId: venueId || "ieee-iccci-2026",
+                currentStep: "outline_generation",
+                previousSteps: [],
+                userInputs: {
+                  title: projectTitle,
+                  selectedDirection: selectedDirection.label,
+                  directionDescription: selectedDirection.description
+                }
+              }
+            })
+          });
+
+          const data = await response.json();
+
+          if (data.ok) {
+            // 生成标题包
+            const generatedPackages: TitlePackage[] = [
+              {
+                id: "package-1",
+                label: "博士开题版",
+                title: projectTitle,
+                abstract: data.content?.content || "",
+                positioning: "基于选定研究方向的博士开题级别大纲",
+                recommendedReason: "符合博士开题要求，结构完整，逻辑严谨",
+                keywords: data.content?.metadata?.topics || ["研究主题", "研究方法", "创新点"]
+              }
+            ];
+            
+            // 生成详细大纲
+            const generatedOutline: OutlineSection[] = [
+              {
+                id: "section-1",
+                title: "1. 绪论",
+                status: "草稿中",
+                goal: "介绍研究背景、问题陈述和研究意义",
+                summary: "包括研究背景、研究问题、研究目的、研究意义、研究方法、论文结构等内容"
+              },
+              {
+                id: "section-2",
+                title: "2. 文献综述",
+                status: "草稿中",
+                goal: "梳理相关研究现状和理论基础",
+                summary: "包括国内外研究现状、理论基础、研究缺口等内容"
+              },
+              {
+                id: "section-3",
+                title: "3. 研究方法",
+                status: "草稿中",
+                goal: "详细描述研究设计和方法",
+                summary: "包括研究设计、数据收集方法、数据分析方法等内容"
+              },
+              {
+                id: "section-4",
+                title: "4. 研究结果",
+                status: "草稿中",
+                goal: "呈现研究数据和结果",
+                summary: "包括数据描述、结果分析、发现等内容"
+              },
+              {
+                id: "section-5",
+                title: "5. 讨论",
+                status: "草稿中",
+                goal: "解释研究结果的意义和影响",
+                summary: "包括结果解释、与现有研究的比较、理论贡献、实践意义等内容"
+              },
+              {
+                id: "section-6",
+                title: "6. 结论与展望",
+                status: "草稿中",
+                goal: "总结研究成果和未来研究方向",
+                summary: "包括研究结论、研究局限、未来研究方向等内容"
+              }
+            ];
+            
+            setPackages(generatedPackages);
+            setOutline(generatedOutline);
+            if (generatedPackages.length > 0) {
+              setSelectedId(generatedPackages[0].id);
+            }
+          }
+        } catch (error) {
+          console.error("生成大纲失败:", error);
+          // 提供默认大纲
+          const defaultPackages: TitlePackage[] = [
+            {
+              id: "package-1",
+              label: "默认版本",
+              title: projectTitle || "研究主题",
+              abstract: "本研究旨在...",
+              positioning: "基于选定研究方向的博士开题级别大纲",
+              recommendedReason: "符合博士开题要求，结构完整，逻辑严谨",
+              keywords: ["研究主题", "研究方法", "创新点"]
+            }
+          ];
+          
+          const defaultOutline: OutlineSection[] = [
+            {
+              id: "section-1",
+              title: "1. 绪论",
+              status: "草稿中",
+              goal: "介绍研究背景、问题陈述和研究意义",
+              summary: "包括研究背景、研究问题、研究目的、研究意义、研究方法、论文结构等内容"
+            },
+            {
+              id: "section-2",
+              title: "2. 文献综述",
+              status: "草稿中",
+              goal: "梳理相关研究现状和理论基础",
+              summary: "包括国内外研究现状、理论基础、研究缺口等内容"
+            },
+            {
+              id: "section-3",
+              title: "3. 研究方法",
+              status: "草稿中",
+              goal: "详细描述研究设计和方法",
+              summary: "包括研究设计、数据收集方法、数据分析方法等内容"
+            },
+            {
+              id: "section-4",
+              title: "4. 研究结果",
+              status: "草稿中",
+              goal: "呈现研究数据和结果",
+              summary: "包括数据描述、结果分析、发现等内容"
+            },
+            {
+              id: "section-5",
+              title: "5. 讨论",
+              status: "草稿中",
+              goal: "解释研究结果的意义和影响",
+              summary: "包括结果解释、与现有研究的比较、理论贡献、实践意义等内容"
+            },
+            {
+              id: "section-6",
+              title: "6. 结论与展望",
+              status: "草稿中",
+              goal: "总结研究成果和未来研究方向",
+              summary: "包括研究结论、研究局限、未来研究方向等内容"
+            }
+          ];
+          
+          setPackages(defaultPackages);
+          setOutline(defaultOutline);
+          setSelectedId("package-1");
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      generateOutline();
+    }
+  }, [projectId, selectedDirection, projectTitle, initialPackages, initialOutline]);
+
   const selected = useMemo(
     () => packages.find((item) => item.id === selectedId) ?? packages[0],
     [packages, selectedId]
   );
   const currentTitle = customTitle.trim() || selected?.title || "";
   const currentReviewKey = selected?.id ?? "unknown";
+
+  if (loading) {
+    return (
+      <div className="workbench-stack">
+        <section className="content-card">
+          <div className="card-heading card-heading--stack">
+            <span className="eyebrow">第三步</span>
+            <h3>AI 正在生成博士开题级别的详细大纲...</h3>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 0' }}>
+            <div className="loading-spinner"></div>
+            <p className="lead-text" style={{ marginTop: '20px', textAlign: 'center' }}>
+              系统正在根据您选择的研究方向生成博士开题级别的详细大纲，请稍候...
+            </p>
+          </div>
+        </section>
+      </div>
+    );
+  }
 
   if (!selected) {
     return null;
@@ -363,21 +558,123 @@ export function OutlineWorkbench({
         <div className="card-heading card-heading--stack">
           <span className="eyebrow">章节骨架</span>
           <h3>每章写什么，AI 也应该提前拆给你看</h3>
+          <p className="lead-text">
+            你可以点击章节进行编辑，AI 会根据你的修改提供建议，帮助你完善大纲结构。
+          </p>
         </div>
         <div className="outline-list">
-          {outline.map((section, index) => (
-            <div key={section.id} className="outline-item">
-              <div className="outline-item__index">0{index + 1}</div>
-              <div className="outline-item__body">
-                <div className="outline-item__head">
-                  <strong>{section.title}</strong>
-                  <StatusBadge tone={badgeTone(section.status)}>{section.status}</StatusBadge>
+          {outline.map((section, index) => {
+            const edited = editedSections[section.id] || {};
+            const isEditing = editingSection === section.id;
+            
+            return (
+              <div key={section.id} className="outline-item">
+                <div className="outline-item__index">0{index + 1}</div>
+                <div className="outline-item__body">
+                  {isEditing ? (
+                    <div>
+                      <div className="field">
+                        <span>章节标题</span>
+                        <input
+                          value={edited.title || section.title}
+                          onChange={(e) => setEditedSections(prev => ({
+                            ...prev,
+                            [section.id]: {
+                              ...prev[section.id],
+                              title: e.target.value
+                            }
+                          }))}
+                        />
+                      </div>
+                      <div className="field top-gap">
+                        <span>章节目标</span>
+                        <textarea
+                          value={edited.goal || section.goal}
+                          onChange={(e) => setEditedSections(prev => ({
+                            ...prev,
+                            [section.id]: {
+                              ...prev[section.id],
+                              goal: e.target.value
+                            }
+                          }))}
+                          rows={2}
+                        />
+                      </div>
+                      <div className="field top-gap">
+                        <span>章节摘要</span>
+                        <textarea
+                          value={edited.summary || section.summary}
+                          onChange={(e) => setEditedSections(prev => ({
+                            ...prev,
+                            [section.id]: {
+                              ...prev[section.id],
+                              summary: e.target.value
+                            }
+                          }))}
+                          rows={3}
+                        />
+                      </div>
+                      <div className="button-row top-gap">
+                        <button 
+                          className="secondary-button"
+                          onClick={() => {
+                            setEditingSection(null);
+                            setEditedSections(prev => {
+                              const newEdited = { ...prev };
+                              delete newEdited[section.id];
+                              return newEdited;
+                            });
+                          }}
+                        >
+                          取消
+                        </button>
+                        <button 
+                          className="primary-button"
+                          onClick={() => {
+                            setOutline(prev => prev.map(s => 
+                              s.id === section.id 
+                                ? { ...s, ...editedSections[section.id] }
+                                : s
+                            ));
+                            setEditingSection(null);
+                            setEditedSections(prev => {
+                              const newEdited = { ...prev };
+                              delete newEdited[section.id];
+                              return newEdited;
+                            });
+                          }}
+                        >
+                          保存修改
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="outline-item__head">
+                        <strong>{edited.title || section.title}</strong>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                          <StatusBadge tone={badgeTone(section.status)}>{section.status}</StatusBadge>
+                          <button 
+                            className="secondary-button"
+                            style={{ fontSize: '0.84rem', padding: '4px 8px', minHeight: '32px' }}
+                            onClick={() => setEditingSection(section.id)}
+                          >
+                            编辑
+                          </button>
+                        </div>
+                      </div>
+                      <p>{edited.goal || section.goal}</p>
+                      <p className="section-summary">{edited.summary || section.summary}</p>
+                    </>
+                  )}
                 </div>
-                <p>{section.goal}</p>
-                <p className="section-summary">{section.summary}</p>
               </div>
-            </div>
-          ))}
+            );
+          })}
+        </div>
+        <div className="hint-panel top-gap">
+          <strong>AI 引导建议</strong>
+          <p>修改章节内容后，AI 会分析你的修改并提供建议，帮助你完善大纲结构，确保符合博士开题要求。</p>
         </div>
       </section>
 

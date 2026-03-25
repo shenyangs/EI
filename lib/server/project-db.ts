@@ -25,12 +25,12 @@ export async function createProject(project: Omit<Project, 'id' | 'createdAt' | 
 
 export async function getProject(id: string) {
   const db = await getDatabase();
-  return await db.get<Project>('SELECT * FROM projects WHERE id = ?', [id]);
+  return await db.get('SELECT * FROM projects WHERE id = ?', [id]) as Project | null;
 }
 
 export async function getProjects() {
   const db = await getDatabase();
-  return await db.all<Project[]>('SELECT * FROM projects ORDER BY updatedAt DESC');
+  return await db.all('SELECT * FROM projects ORDER BY updatedAt DESC') as Project[];
 }
 
 export async function updateProject(id: string, updates: Partial<Project>) {
@@ -89,7 +89,7 @@ export async function getProjectVersions(projectId: string, key?: string) {
     : 'SELECT * FROM project_versions WHERE projectId = ? ORDER BY createdAt DESC';
   const params = key ? [projectId, key] : [projectId];
 
-  const versions = await db.all<any[]>(query, params);
+  const versions = await db.all(query, params);
   return versions.map(v => ({
     ...v,
     payload: JSON.parse(v.payload)
