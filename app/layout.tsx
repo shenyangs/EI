@@ -26,13 +26,14 @@ export default function RootLayout({
         <div className="ambient ambient--two" />
         <div className="site-shell">
           <header className="site-header">
-            <div>
+            <div className="site-header__copy">
+              <span className="eyebrow">移动优先工作台</span>
               <Link className="brand" href="/">
                 Atelier EI
               </Link>
               <p className="brand-subtitle">跨学科时尚与设计 EI 论文工作台</p>
             </div>
-            <div className="site-header__right">
+            <div className="site-header__panel">
               <ConnectionLights
                 initialModelConnected={ai.canGeneratePaperDraft}
                 initialWebSearchConnected={ai.canUseWebSearch}

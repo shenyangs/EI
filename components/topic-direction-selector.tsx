@@ -113,15 +113,32 @@ export function TopicDirectionSelector({
   }
 
   return (
-    <div className="project-page-grid">
-      <section className="content-card content-card--wide">
+    <div className="workbench-stack">
+      <section className="content-card content-card--accent">
         <div className="card-heading card-heading--stack">
           <span className="eyebrow">第二步</span>
-          <h3>先看 AI 给出的题目类型方案，再由你选定或改写。</h3>
+          <h3>先从 AI 给出的路线里选一条，再决定要不要自己微调。</h3>
         </div>
         <p className="lead-text">
-          这一页不该只告诉你“系统判断是什么”，而是应该先把几种写法方案摆出来。你可以直接采用，也可以按自己的想法改。
+          移动版先把当前选中的方向放在最上面，再把可选方案排在下面。你不用一边横向比较、一边来回找说明，顺着往下看就能完成这一页。
         </p>
+        <div className="selection-spotlight top-gap">
+          <div>
+            <span className="selection-spotlight__label">当前选中</span>
+            <strong>{selected.label}</strong>
+            <p>{selected.description}</p>
+          </div>
+          <StatusBadge tone={toneFromConfidence(selected.confidence)}>
+            {selected.confidence}
+          </StatusBadge>
+        </div>
+        <div className="keyword-cluster top-gap">
+          {selected.readyOutputs.map((item) => (
+            <span key={item} className="ghost-chip">
+              {item}
+            </span>
+          ))}
+        </div>
       </section>
 
       <section className="content-card">
@@ -160,96 +177,95 @@ export function TopicDirectionSelector({
         </div>
       </section>
 
-      <section className="content-card">
-        <div className="card-heading card-heading--stack">
-          <span className="eyebrow">当前选中方案</span>
-          <h3>{selected.label}</h3>
-        </div>
-        <p className="lead-text">{selected.description}</p>
-        <div className="stack-list top-gap">
-          <div className="line-item line-item--column">
-            <strong>为什么适合</strong>
-            <ul className="bullet-list">
-              {selected.whyItFits.map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ul>
+      <div className="project-page-grid">
+        <section className="content-card">
+          <div className="card-heading card-heading--stack">
+            <span className="eyebrow">当前选中方案</span>
+            <h3>{selected.label}</h3>
           </div>
-          <div className="line-item line-item--column">
-            <strong>后面该怎么写</strong>
-            <ul className="bullet-list">
-              {selected.writingStrategy.map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ul>
+          <div className="stack-list">
+            <div className="line-item line-item--column">
+              <strong>为什么适合</strong>
+              <ul className="bullet-list">
+                {selected.whyItFits.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
+            <div className="line-item line-item--column">
+              <strong>后面该怎么写</strong>
+              <ul className="bullet-list">
+                {selected.writingStrategy.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      <section className="content-card content-card--wide">
-        <div className="card-heading card-heading--stack">
-          <span className="eyebrow">你也可以直接改</span>
-          <h3>如果你不想完全照着 AI 的方案走，在这里写你的调整方向</h3>
-        </div>
-        <div className="field field--full">
-          <textarea
-            onChange={(event) => setCustomNote(event.target.value)}
-            placeholder="例如：我想保留设计实践主线，但用户测试部分要写得更重，结果章要突出情感识别度。"
-            rows={4}
-            value={customNote}
-          />
-        </div>
-        <div className="top-gap">
-          <ArchiveActionPanel
-            archiveLabel="确认并存档这个方向"
-            archivedAt={archiveRecord?.archivedAt}
-            archivedSummary={
-              archiveRecord ? `${archiveRecord.title}：${archiveRecord.summary}` : undefined
-            }
-            currentLabel="当前将被锁定的研究方向"
-            currentSummary={currentSummary}
-            description="这一页最重要的不是“看过了”，而是把你真正决定采用的方向固定下来。后面生成标题、摘要和章节时，都应该基于这次确认后的版本继续。"
-            helperText={
-              isCurrentArchived
-                ? "这一页已经有明确起点了。你后面如果再改方向，这里会立刻提示“当前内容有新改动”，避免你以为系统还在沿用旧决定。"
-                : "先确认并存档，后面的框架才有稳定出发点。否则你每次切方案，都很难说清当前框架到底是基于哪条路线生成的。"
-            }
-            archiveDisabled={saving}
-            isCurrentArchived={isCurrentArchived}
-            onArchive={handleArchive}
-            secondaryAction={
-              isReady && isCurrentArchived ? (
-                <Link
-                  className="primary-button"
-                  href={buildVenueHref(`/projects/${projectId}/outline`, venueId)}
-                >
-                  用这份已存档方向生成论文框架
-                </Link>
-              ) : (
-                <button className="secondary-button" disabled type="button">
-                  {isReady ? "先确认并存档，再进入论文框架" : "正在读取本地存档..."}
-                </button>
-              )
-            }
-            title="别只选方向，要把这一版正式留档"
-          />
-        </div>
-        <div className="hint-panel top-gap">
-          <strong>系统反馈</strong>
-          <p>{statusMessage}</p>
-        </div>
-        <div className="top-gap">
-          <VersionHistoryPanel
-            currentFingerprint={currentFingerprint}
-            description="这里保存的是你曾经正式点过确认的方向版本。回滚后，后面的框架会重新基于这版方向继续。"
-            error={historyError}
-            loading={historyLoading}
-            onRestore={restoreVersion}
-            title="研究方向历史记录"
-            versions={versions}
-          />
-        </div>
-      </section>
+        <section className="content-card">
+          <div className="card-heading card-heading--stack">
+            <span className="eyebrow">你也可以直接改</span>
+            <h3>如果不想完全照着 AI 方案走，就在这里补一句方向说明</h3>
+          </div>
+          <div className="field field--full">
+            <textarea
+              onChange={(event) => setCustomNote(event.target.value)}
+              placeholder="例如：我想保留设计实践主线，但用户测试部分要写得更重，结果章要突出情感识别度。"
+              rows={4}
+              value={customNote}
+            />
+          </div>
+          <div className="hint-panel top-gap">
+            <strong>系统反馈</strong>
+            <p>{statusMessage}</p>
+          </div>
+        </section>
+      </div>
+
+      <ArchiveActionPanel
+        archiveLabel="确认并存档这个方向"
+        archivedAt={archiveRecord?.archivedAt}
+        archivedSummary={
+          archiveRecord ? `${archiveRecord.title}：${archiveRecord.summary}` : undefined
+        }
+        currentLabel="当前将被锁定的研究方向"
+        currentSummary={currentSummary}
+        description="这一页最重要的不是“看过了”，而是把你真正决定采用的方向固定下来。后面生成标题、摘要和章节时，都应该基于这次确认后的版本继续。"
+        helperText={
+          isCurrentArchived
+            ? "这一页已经有明确起点了。你后面如果再改方向，这里会立刻提示“当前内容有新改动”，避免你以为系统还在沿用旧决定。"
+            : "先确认并存档，后面的框架才有稳定出发点。否则你每次切方案，都很难说清当前框架到底是基于哪条路线生成的。"
+        }
+        archiveDisabled={saving}
+        isCurrentArchived={isCurrentArchived}
+        onArchive={handleArchive}
+        secondaryAction={
+          isReady && isCurrentArchived ? (
+            <Link
+              className="primary-button"
+              href={buildVenueHref(`/projects/${projectId}/outline`, venueId)}
+            >
+              用这份已存档方向生成论文框架
+            </Link>
+          ) : (
+            <button className="secondary-button" disabled type="button">
+              {isReady ? "先确认并存档，再进入论文框架" : "正在读取本地存档..."}
+            </button>
+          )
+        }
+        title="别只选方向，要把这一版正式留档"
+      />
+
+      <VersionHistoryPanel
+        currentFingerprint={currentFingerprint}
+        description="这里保存的是你曾经正式点过确认的方向版本。回滚后，后面的框架会重新基于这版方向继续。"
+        error={historyError}
+        loading={historyLoading}
+        onRestore={restoreVersion}
+        title="研究方向历史记录"
+        versions={versions}
+      />
     </div>
   );
 }

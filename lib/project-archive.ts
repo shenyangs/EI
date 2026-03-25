@@ -139,8 +139,7 @@ export function useProjectArchive(projectId: string) {
     getRecord,
     isReady: readyProjectId === projectId,
     matchesCurrent,
-    records
-    ,
+    records,
     upsertRecord
   };
 }

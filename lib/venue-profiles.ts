@@ -185,6 +185,9 @@ export function buildVenueHref(href: string, venueId?: string | null) {
     return href;
   }
 
-  const separator = href.includes("?") ? "&" : "?";
-  return `${href}${separator}venue=${venueId}`;
+  const [baseHref, hash] = href.split("#", 2);
+  const separator = baseHref.includes("?") ? "&" : "?";
+  const hrefWithVenue = `${baseHref}${separator}venue=${venueId}`;
+
+  return hash ? `${hrefWithVenue}#${hash}` : hrefWithVenue;
 }

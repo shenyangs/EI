@@ -1,121 +1,70 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import path from "node:path";
-import { randomUUID } from "node:crypto";
-
+import { getDatabase } from './db';
 import type {
   CreateProjectVersionInput,
   ProjectVersionPayload,
   ProjectVersionRecord
 } from "@/lib/project-version-types";
 
-type ProjectVersionStore = {
-  projectId: string;
-  versions: ProjectVersionRecord[];
-};
-
-const DATA_DIR = path.join(process.cwd(), "data", "project-versions");
-
-function assertProjectId(projectId: string) {
-  if (!/^[a-zA-Z0-9_-]+$/.test(projectId)) {
-    throw new Error("非法项目 ID。");
-  }
-}
-
-async function ensureDataDir() {
-  await mkdir(DATA_DIR, { recursive: true });
-}
-
-function getStoreFile(projectId: string) {
-  assertProjectId(projectId);
-  return path.join(DATA_DIR, `${projectId}.json`);
-}
-
-async function readStore(projectId: string): Promise<ProjectVersionStore> {
-  await ensureDataDir();
-
-  try {
-    const raw = await readFile(getStoreFile(projectId), "utf8");
-    const parsed = JSON.parse(raw) as ProjectVersionStore;
-
-    return {
-      projectId,
-      versions: Array.isArray(parsed.versions) ? parsed.versions : []
-    };
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-      return {
-        projectId,
-        versions: []
-      };
-    }
-
-    throw error;
-  }
-}
-
-async function writeStore(projectId: string, store: ProjectVersionStore) {
-  await ensureDataDir();
-  await writeFile(getStoreFile(projectId), `${JSON.stringify(store, null, 2)}\n`, "utf8");
-}
-
-function sortVersions<TPayload extends ProjectVersionPayload>(
-  versions: ProjectVersionRecord<TPayload>[]
-) {
-  return [...versions].sort((left, right) => right.createdAt.localeCompare(left.createdAt));
-}
-
-function pruneVersions(versions: ProjectVersionRecord[]) {
-  const grouped = new Map<string, number>();
-
-  return sortVersions(versions).filter((version) => {
-    const current = grouped.get(version.key) ?? 0;
-
-    if (current >= 20) {
-      return false;
-    }
-
-    grouped.set(version.key, current + 1);
-    return true;
-  });
-}
-
 export async function listProjectVersions(projectId: string, key?: string) {
-  const store = await readStore(projectId);
-  const versions = key ? store.versions.filter((version) => version.key === key) : store.versions;
+  const db = await getDatabase();
+  const query = key
+    ? 'SELECT * FROM project_versions WHERE projectId = ? AND key = ? ORDER BY createdAt DESC'
+    : 'SELECT * FROM project_versions WHERE projectId = ? ORDER BY createdAt DESC';
+  const params = key ? [projectId, key] : [projectId];
 
-  return sortVersions(versions);
+  const versions = await db.all<any[]>(query, params);
+  return versions.map(v => ({
+    id: v.id.toString(),
+    projectId: v.projectId,
+    key: v.key,
+    title: v.title,
+    summary: v.summary,
+    fingerprint: v.fingerprint,
+    createdAt: new Date(v.createdAt).toISOString(),
+    payload: JSON.parse(v.payload)
+  }));
 }
 
 export async function createProjectVersion<TPayload extends ProjectVersionPayload>(
   projectId: string,
   input: CreateProjectVersionInput<TPayload>
 ) {
-  const store = await readStore(projectId);
-  const existing = store.versions.find(
-    (version) => version.key === input.key && version.fingerprint === input.fingerprint
-  ) as ProjectVersionRecord<TPayload> | undefined;
+  const db = await getDatabase();
+  
+  // 检查是否已存在相同的版本
+  const existing = await db.get<any>(
+    'SELECT * FROM project_versions WHERE projectId = ? AND key = ? AND fingerprint = ?',
+    [projectId, input.key, input.fingerprint]
+  );
 
   if (existing) {
-    return existing;
+    return {
+      id: existing.id.toString(),
+      projectId: existing.projectId,
+      key: existing.key,
+      title: existing.title,
+      summary: existing.summary,
+      fingerprint: existing.fingerprint,
+      createdAt: new Date(existing.createdAt).toISOString(),
+      payload: JSON.parse(existing.payload)
+    };
   }
 
-  const record: ProjectVersionRecord<TPayload> = {
-    id: randomUUID(),
+  // 插入新版本
+  const now = Date.now();
+  await db.run(
+    'INSERT INTO project_versions (projectId, key, fingerprint, title, summary, payload, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    [projectId, input.key, input.fingerprint, input.title, input.summary, JSON.stringify(input.payload), now]
+  );
+
+  return {
+    id: db.lastID.toString(),
     projectId,
     key: input.key,
     title: input.title,
     summary: input.summary,
     fingerprint: input.fingerprint,
-    createdAt: new Date().toISOString(),
+    createdAt: new Date(now).toISOString(),
     payload: input.payload
   };
-
-  const nextStore: ProjectVersionStore = {
-    projectId,
-    versions: pruneVersions([record, ...store.versions])
-  };
-
-  await writeStore(projectId, nextStore);
-
-  return record;
 }

@@ -4,12 +4,15 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 
 import { ArchiveActionPanel } from "@/components/archive-action-panel";
 import { QualityReviewPanel } from "@/components/quality-review-panel";
+import { VersionHistoryPanel } from "@/components/version-history-panel";
 import type { FullTextSection } from "@/lib/demo-data";
 import {
   createArchiveFingerprint,
   shortenArchiveText,
   useProjectArchive
 } from "@/lib/project-archive";
+import { useProjectVersionHistory } from "@/lib/project-version-client";
+import type { FullTextVersionPayload } from "@/lib/project-version-types";
 import type { AiQualityReport } from "@/lib/quality-check";
 import type { VenueProfile } from "@/lib/venue-profiles";
 
@@ -79,7 +82,7 @@ export function FullTextPreview({
   const [review, setReview] = useState<AiQualityReport | null>(null);
   const [reviewLoading, setReviewLoading] = useState(false);
   const [isPending, startTransition] = useTransition();
-  const { archiveCurrent, getRecord, matchesCurrent } = useProjectArchive(projectId);
+  const { archiveCurrent, getRecord, matchesCurrent, upsertRecord } = useProjectArchive(projectId);
 
   const currentFullText = useMemo(() => {
     if (generatedPreview) {
@@ -97,6 +100,13 @@ export function FullTextPreview({
   const currentFingerprint = createArchiveFingerprint([currentFullText]);
   const archiveRecord = getRecord(archiveKey);
   const isCurrentArchived = matchesCurrent(archiveKey, currentFingerprint);
+  const {
+    error: historyError,
+    loading: historyLoading,
+    saveVersion,
+    saving,
+    versions
+  } = useProjectVersionHistory<FullTextVersionPayload>(projectId, archiveKey);
 
   async function runFullTextCheck(content: string) {
     setReviewLoading(true);
@@ -191,30 +201,125 @@ ${sections.map((item) => `${item.title}：${item.content.join(" ")}`).join("\n")
     });
   }
 
-  function archiveCurrentFullText() {
-    archiveCurrent({
+  async function archiveCurrentFullText() {
+    const localRecord = archiveCurrent({
       key: archiveKey,
       fingerprint: currentFingerprint,
       title: projectTitle,
       summary: shortenArchiveText(currentFullText, 100)
     });
-    setMessage("已确认并存档当前全文。这一版现在已经有明确的定稿节点，后面继续整合或润色也不会把它冲掉。");
+
+    setMessage("正在把当前全文写入服务端版本记录...");
+
+    try {
+      const version = await saveVersion({
+        key: archiveKey,
+        fingerprint: currentFingerprint,
+        title: projectTitle,
+        summary: shortenArchiveText(currentFullText, 100),
+        payload: {
+          type: "fulltext",
+          generatedPreview
+        }
+      });
+
+      upsertRecord({
+        ...localRecord,
+        archivedAt: version.createdAt
+      });
+      setMessage("已确认并同步到服务端版本记录。这一版现在已经有明确的定稿节点，后面继续整合或润色也不会把它冲掉。");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "服务端版本保存失败，但本地确认状态已保留。");
+    }
+  }
+
+  function restoreVersion(version: (typeof versions)[number]) {
+    setGeneratedPreview(version.payload.generatedPreview);
+    upsertRecord({
+      key: archiveKey,
+      fingerprint: version.fingerprint,
+      title: version.title,
+      summary: version.summary,
+      archivedAt: version.createdAt
+    });
+    setMessage("已恢复到之前确认过的全文版本。你现在看到的是服务端历史里保存过的完整稿。");
+    void runFullTextCheck(
+      version.payload.generatedPreview || [
+        `题目：${projectTitle}`,
+        `摘要：${abstract}`,
+        `关键词：${keywords.join("、")}`,
+        ...sections.map((section) => `${section.title}\n${section.content.join("\n\n")}`)
+      ].join("\n\n")
+    );
   }
 
   return (
     <div className="workbench-stack">
-      <div className="button-row">
-        <button className="secondary-button" onClick={regeneratePreview} type="button">
-          {isPending ? "整合中..." : "重新整合全文"}
-        </button>
-      </div>
+      <section className="content-card content-card--accent">
+        <div className="card-heading card-heading--stack">
+          <span className="eyebrow">完整全文预览</span>
+          <h3>先通读这一版，再决定要不要定稿</h3>
+        </div>
+        <div className="selection-spotlight top-gap">
+          <div>
+            <span className="selection-spotlight__label">当前稿件</span>
+            <strong>{projectTitle}</strong>
+            <p>
+              当前约 {currentFullText.replace(/\s+/g, "").length} 字，关键词 {keywords.length} 个。
+            </p>
+          </div>
+          <span className="ghost-chip ghost-chip--accent">{venueProfile.shortName}</span>
+        </div>
+        <div className="button-row top-gap">
+          <button className="secondary-button" onClick={regeneratePreview} type="button">
+            {isPending ? "整合中..." : "重新整合全文"}
+          </button>
+        </div>
+        <div className="hint-panel top-gap">
+          <strong>系统反馈</strong>
+          <p>{message}</p>
+        </div>
+      </section>
 
-      <div className="hint-panel">
-        <strong>系统反馈</strong>
-        <p>{message}</p>
-      </div>
+      <section className="content-card">
+        <div className="card-heading card-heading--stack">
+          <span className="eyebrow">预览正文</span>
+          <h3>先看稿，再决定是否继续处理</h3>
+        </div>
+        {generatedPreview ? (
+          <div className="editor-surface fulltext-surface">
+            <p>{generatedPreview}</p>
+          </div>
+        ) : (
+          <div className="editor-surface fulltext-surface">
+            <h4>题目</h4>
+            <p>{projectTitle}</p>
+            <h4>摘要</h4>
+            <p>{abstract}</p>
+            <h4>关键词</h4>
+            <p>{keywords.join("、")}</p>
+            {sections.map((section) => (
+              <div key={section.id} className="paper-preview-block">
+                <h4>{section.title}</h4>
+                {section.content.map((paragraph) => (
+                  <p key={paragraph}>{paragraph}</p>
+                ))}
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
 
       <QualityReviewPanel
+        actionContext={{
+          scope: "fulltext",
+          projectId,
+          sections: sections.map((section) => ({
+            id: section.id,
+            title: section.title
+          })),
+          venueId: venueProfile.id
+        }}
         emptyText="全文合成后，系统会自动检查长度、结构一致性和会议适配度。"
         loading={reviewLoading}
         report={review}
@@ -235,33 +340,21 @@ ${sections.map((item) => `${item.title}：${item.content.join(" ")}`).join("\n")
             ? "这一版全文已经留下稳定记录，后面继续整合时如果内容变了，这里会立刻提醒你当前版本还没重新存档。"
             : "先确认并存档，再把这一版当成导出基线。这样后面做格式化、导出 Word 或 PDF 时，取到的就是你真的点头过的版本。"
         }
+        archiveDisabled={saving}
         isCurrentArchived={isCurrentArchived}
         onArchive={archiveCurrentFullText}
         title="全文不是看看就算，要明确留下这一版定稿"
       />
 
-      {generatedPreview ? (
-        <div className="editor-surface fulltext-surface">
-          <p>{generatedPreview}</p>
-        </div>
-      ) : (
-        <div className="editor-surface fulltext-surface">
-          <h4>题目</h4>
-          <p>{projectTitle}</p>
-          <h4>摘要</h4>
-          <p>{abstract}</p>
-          <h4>关键词</h4>
-          <p>{keywords.join("、")}</p>
-          {sections.map((section) => (
-            <div key={section.id} className="paper-preview-block">
-              <h4>{section.title}</h4>
-              {section.content.map((paragraph) => (
-                <p key={paragraph}>{paragraph}</p>
-              ))}
-            </div>
-          ))}
-        </div>
-      )}
+      <VersionHistoryPanel
+        currentFingerprint={currentFingerprint}
+        description="这里保存的是你正式确认过的完整稿。回滚后，全文区会直接恢复到那次存档的内容，并重新进行全文自检。"
+        error={historyError}
+        loading={historyLoading}
+        onRestore={restoreVersion}
+        title="全文历史记录"
+        versions={versions}
+      />
     </div>
   );
 }

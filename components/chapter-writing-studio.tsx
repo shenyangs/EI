@@ -6,12 +6,15 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { ArchiveActionPanel } from "@/components/archive-action-panel";
 import { QualityReviewPanel } from "@/components/quality-review-panel";
 import { StatusBadge } from "@/components/status-badge";
+import { VersionHistoryPanel } from "@/components/version-history-panel";
 import type { ChapterDraft } from "@/lib/demo-data";
 import {
   createArchiveFingerprint,
   shortenArchiveText,
   useProjectArchive
 } from "@/lib/project-archive";
+import { useProjectVersionHistory } from "@/lib/project-version-client";
+import type { ChapterVersionPayload } from "@/lib/project-version-types";
 import type { AiQualityReport } from "@/lib/quality-check";
 import { buildVenueHref, type VenueProfile } from "@/lib/venue-profiles";
 
@@ -27,6 +30,7 @@ type ChapterWritingStudioProps = {
   chapters: ChapterDraft[];
   venueProfile: VenueProfile;
   venueId?: string;
+  initialChapterId?: string;
 };
 
 async function requestDraft(prompt: string) {
@@ -134,9 +138,14 @@ export function ChapterWritingStudio({
   projectTitle,
   chapters,
   venueProfile,
-  venueId
+  venueId,
+  initialChapterId
 }: ChapterWritingStudioProps) {
-  const [activeId, setActiveId] = useState(chapters[0]?.id ?? "");
+  const [activeId, setActiveId] = useState(() =>
+    chapters.some((chapter) => chapter.id === initialChapterId)
+      ? initialChapterId ?? ""
+      : chapters[0]?.id ?? ""
+  );
   const [message, setMessage] = useState("每一章先给你正文，再允许你局部重写。");
   const [customInstruction, setCustomInstruction] = useState("");
   const [draftMap, setDraftMap] = useState<Record<string, string[]>>(() =>
@@ -146,7 +155,13 @@ export function ChapterWritingStudio({
   const [checkingMap, setCheckingMap] = useState<Record<string, boolean>>({});
   const [isPending, startTransition] = useTransition();
   const inFlightIdsRef = useRef(new Set<string>());
-  const { archiveCurrent, getRecord, isReady, matchesCurrent } = useProjectArchive(projectId);
+  const {
+    archiveCurrent,
+    getRecord,
+    isReady,
+    matchesCurrent,
+    upsertRecord
+  } = useProjectArchive(projectId);
 
   const activeChapter = useMemo(
     () => chapters.find((chapter) => chapter.id === activeId) ?? chapters[0],
@@ -162,6 +177,13 @@ export function ChapterWritingStudio({
   const activeFingerprint = createArchiveFingerprint(activeParagraphs);
   const activeArchiveRecord = getRecord(activeArchiveKey);
   const isActiveArchived = matchesCurrent(activeArchiveKey, activeFingerprint);
+  const {
+    error: historyError,
+    loading: historyLoading,
+    saveVersion,
+    saving,
+    versions
+  } = useProjectVersionHistory<ChapterVersionPayload>(projectId, activeArchiveKey);
   const archivedChapterCount = chapters.filter((chapter) => {
     const paragraphs = draftMap[chapter.id] ?? chapter.paragraphs;
 
@@ -357,19 +379,89 @@ ${activeParagraphs.join("\n\n")}
     });
   }
 
-  function archiveCurrentChapter() {
-    archiveCurrent({
+  async function archiveCurrentChapter() {
+    const localRecord = archiveCurrent({
       key: activeArchiveKey,
       fingerprint: activeFingerprint,
       title: activeChapter.title,
       summary: shortenArchiveText(`共 ${activeParagraphs.length} 段；${activeParagraphs.join(" ")}`)
     });
-    setMessage(`已确认并存档“${activeChapter.title}”。后面如果你继续重写，这里会明确提示“当前内容有新改动”，不会再让你分不清哪一版才算定稿。`);
+
+    setMessage(`正在把“${activeChapter.title}”写入服务端版本记录...`);
+
+    try {
+      const version = await saveVersion({
+        key: activeArchiveKey,
+        fingerprint: activeFingerprint,
+        title: activeChapter.title,
+        summary: shortenArchiveText(`共 ${activeParagraphs.length} 段；${activeParagraphs.join(" ")}`),
+        payload: {
+          type: "chapter",
+          chapterId: activeChapter.id,
+          paragraphs: activeParagraphs
+        }
+      });
+
+      upsertRecord({
+        ...localRecord,
+        archivedAt: version.createdAt
+      });
+      setMessage(`已确认并同步到服务端版本记录：“${activeChapter.title}”现在有了可回滚版本。后面如果你继续重写，这里会明确提示当前内容已经和存档不一致。`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "服务端版本保存失败，但本地确认状态已保留。");
+    }
+  }
+
+  function restoreVersion(version: (typeof versions)[number]) {
+    const restoredKey = `chapter:${version.payload.chapterId}`;
+    const restoredChapter =
+      chapters.find((chapter) => chapter.id === version.payload.chapterId) ?? activeChapter;
+
+    setActiveId(version.payload.chapterId);
+    setDraftMap((current) => ({
+      ...current,
+      [version.payload.chapterId]: version.payload.paragraphs
+    }));
+    upsertRecord({
+      key: restoredKey,
+      fingerprint: version.fingerprint,
+      title: version.title,
+      summary: version.summary,
+      archivedAt: version.createdAt
+    });
+    setMessage(`已恢复“${restoredChapter.title}”的历史版本。你现在看到的是之前确认过的正文，可以继续修改，也可以直接再次存档。`);
+    void runChapterCheck(
+      version.payload.chapterId,
+      version.payload.paragraphs,
+      restoredChapter.goal,
+      restoredChapter.title
+    );
   }
 
   return (
-    <div className="chapter-studio">
-      <div className="chapter-menu">
+    <div className="workbench-stack">
+      <section className="content-card content-card--accent">
+        <div className="card-heading card-heading--stack">
+          <span className="eyebrow">当前进度</span>
+          <h3>一次只处理一章，处理完再进入下一章。</h3>
+        </div>
+        <p className="lead-text">
+          这一页现在会先突出当前章节和整体存档进度，再把正文、改写、自检、补证据这些动作按顺序摆好。手机上不用在左右两栏之间来回切。
+        </p>
+        <div className="section-ribbon top-gap">
+          <span>当前章节：{activeChapter.title}</span>
+          <span>
+            已存档 {archivedChapterCount}/{chapters.length} 章
+          </span>
+        </div>
+      </section>
+
+      <section className="content-card">
+        <div className="card-heading card-heading--stack">
+          <span className="eyebrow">先选章节</span>
+          <h3>当前只专注处理一章</h3>
+        </div>
+        <div className="chapter-menu chapter-menu--carousel">
         {chapters.map((chapter, index) => {
           const isActive = chapter.id === activeChapter.id;
           const chapterParagraphs = draftMap[chapter.id] ?? chapter.paragraphs;
@@ -417,17 +509,15 @@ ${activeParagraphs.join("\n\n")}
             </button>
           );
         })}
-      </div>
-
-      <div className="chapter-panel">
-        <div className="section-ribbon">
-          <span>当前章节：{activeChapter.title}</span>
-          <span>
-            已存档 {archivedChapterCount}/{chapters.length} 章
-          </span>
         </div>
+      </section>
 
-        <div className="hint-panel">
+      <section className="content-card">
+        <div className="card-heading card-heading--stack">
+          <span className="eyebrow">正文处理</span>
+          <h3>{activeChapter.title}</h3>
+        </div>
+        <div className="hint-panel anchor-section" id="chapter-goal">
           <strong>本章目标</strong>
           <p>{activeChapter.goal}</p>
         </div>
@@ -438,115 +528,132 @@ ${activeParagraphs.join("\n\n")}
           </button>
         </div>
 
-        <div className="editor-surface">
+        <div className="editor-surface anchor-section" id="chapter-editor">
           {activeParagraphs.map((paragraph, index) => (
             <p key={`${activeChapter.id}-${index}-${paragraph}`}>{paragraph}</p>
           ))}
         </div>
+      </section>
 
-        <div className="content-card content-card--soft top-gap">
+      <section className="content-card content-card--soft anchor-section" id="chapter-instruction">
+        <div className="card-heading card-heading--stack">
+          <span className="eyebrow">你可以直接发修改指令</span>
+          <h3>别对着空白页想，哪里不顺就直接提要求</h3>
+        </div>
+        <div className="field field--full">
+          <textarea
+            onChange={(event) => setCustomInstruction(event.target.value)}
+            placeholder="例如：把这一章写得更像方法章，补清测试对象与评价维度，不要再写空话。"
+            rows={3}
+            value={customInstruction}
+          />
+        </div>
+        <div className="button-row top-gap">
+          <button className="secondary-button" onClick={applyCustomInstruction} type="button">
+            按我的要求改这一章
+          </button>
+        </div>
+      </section>
+
+      <div className="project-page-grid">
+        <section className="content-card">
           <div className="card-heading card-heading--stack">
-            <span className="eyebrow">你可以直接发修改指令</span>
-            <h3>别再让你对着空壳发呆，哪里不顺就直接改哪里</h3>
+            <span className="eyebrow">AI 备选写法</span>
+            <h3>不给空框，直接给你 2 条备选建议</h3>
           </div>
-          <div className="field field--full">
-            <textarea
-              onChange={(event) => setCustomInstruction(event.target.value)}
-              placeholder="例如：把这一章写得更像方法章，补清测试对象与评价维度，不要再写空话。"
-              rows={3}
-              value={customInstruction}
-            />
+          <div className="stack-list">
+            {activeChapter.aiOptions.map((item) => (
+              <div key={item} className="line-item line-item--column">
+                <p>{item}</p>
+              </div>
+            ))}
           </div>
-          <div className="button-row top-gap">
-            <button className="secondary-button" onClick={applyCustomInstruction} type="button">
-              按我的要求改这一章
-            </button>
+        </section>
+
+        <section className="content-card anchor-section" id="chapter-evidence">
+          <div className="card-heading card-heading--stack">
+            <span className="eyebrow">还缺什么</span>
+            <h3>本章需要你补的证据点</h3>
           </div>
-        </div>
-
-        <div className="project-page-grid top-gap">
-          <section className="content-card">
-            <div className="card-heading card-heading--stack">
-              <span className="eyebrow">AI 备选写法</span>
-              <h3>不给空框，直接给你 2 条备选建议</h3>
-            </div>
-            <div className="stack-list">
-              {activeChapter.aiOptions.map((item) => (
-                <div key={item} className="line-item line-item--column">
-                  <p>{item}</p>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          <section className="content-card">
-            <div className="card-heading card-heading--stack">
-              <span className="eyebrow">还缺什么</span>
-              <h3>本章需要你补的证据点</h3>
-            </div>
-            <ul className="bullet-list">
-              {activeChapter.evidenceNeeds.map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ul>
-          </section>
-        </div>
-
-        <div className="top-gap">
-          <QualityReviewPanel
-            emptyText="本章生成后，系统会自动检查长度、结构、学术表达和会议适配度。"
-            loading={Boolean(checkingMap[activeChapter.id])}
-            report={reviewMap[activeChapter.id] ?? null}
-            title="本章 AI 自检"
-          />
-        </div>
-
-        <div className="hint-panel top-gap">
-          <strong>系统反馈</strong>
-          <p>{message}</p>
-        </div>
-
-        <div className="top-gap">
-          <ArchiveActionPanel
-            archiveLabel="确认并存档当前章节"
-            archivedAt={activeArchiveRecord?.archivedAt}
-            archivedSummary={
-              activeArchiveRecord
-                ? `${activeArchiveRecord.title}：${activeArchiveRecord.summary}`
-                : undefined
-            }
-            currentLabel="当前将被锁定的章节版本"
-            currentSummary={`当前正文共 ${activeParagraphs.length} 段；开头内容：${shortenArchiveText(
-              activeParagraphs[0] ?? "暂无正文"
-            )}`}
-            description="章节页最需要这个动作，因为这里改动最频繁。你一旦确认并存档，后面继续重写也不会把已经定下来的版本冲掉。"
-            helperText={
-              allChaptersArchived
-                ? "所有章节都已经有确认节点了。现在去看全文时，系统至少知道自己该整合哪一套稳定版本。"
-                : `还需再存档 ${chapters.length - archivedChapterCount} 章，全文整合才会真正建立在已确认内容上。`
-            }
-            isCurrentArchived={isActiveArchived}
-            onArchive={archiveCurrentChapter}
-            secondaryAction={
-              isReady && allChaptersArchived ? (
-                <Link
-                  className="primary-button"
-                  href={buildVenueHref(`/projects/${projectId}/export`, venueId)}
-                >
-                  所有章节已存档，去看完整全文
-                </Link>
-              ) : (
-                <button className="secondary-button" disabled type="button">
-                  {isReady
-                    ? `还需存档 ${chapters.length - archivedChapterCount} 章后再进入全文预览`
-                    : "正在读取本地存档..."}
-                </button>
-              )
-            }
-            title="这一章定下来后，要留一个可回退的版本节点"
-          />
-        </div>
+          <ul className="bullet-list">
+            {activeChapter.evidenceNeeds.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        </section>
       </div>
+
+      <QualityReviewPanel
+        actionContext={{
+          activeChapterId: activeChapter.id,
+          projectId,
+          scope: "chapter",
+          sections: chapters.map((chapter) => ({
+            id: chapter.id,
+            title: chapter.title
+          })),
+          venueId
+        }}
+        emptyText="本章生成后，系统会自动检查长度、结构、学术表达和会议适配度。"
+        loading={Boolean(checkingMap[activeChapter.id])}
+        report={reviewMap[activeChapter.id] ?? null}
+        title="本章 AI 自检"
+      />
+
+      <div className="hint-panel">
+        <strong>系统反馈</strong>
+        <p>{message}</p>
+      </div>
+
+      <ArchiveActionPanel
+        archiveLabel="确认并存档当前章节"
+        archivedAt={activeArchiveRecord?.archivedAt}
+        archivedSummary={
+          activeArchiveRecord
+            ? `${activeArchiveRecord.title}：${activeArchiveRecord.summary}`
+            : undefined
+        }
+        currentLabel="当前将被锁定的章节版本"
+        currentSummary={`当前正文共 ${activeParagraphs.length} 段；开头内容：${shortenArchiveText(
+          activeParagraphs[0] ?? "暂无正文"
+        )}`}
+        description="章节页最需要这个动作，因为这里改动最频繁。你一旦确认并存档，后面继续重写也不会把已经定下来的版本冲掉。"
+        helperText={
+          allChaptersArchived
+            ? "所有章节都已经有确认节点了。现在去看全文时，系统至少知道自己该整合哪一套稳定版本。"
+            : `还需再存档 ${chapters.length - archivedChapterCount} 章，全文整合才会真正建立在已确认内容上。`
+        }
+        archiveDisabled={saving}
+        isCurrentArchived={isActiveArchived}
+        onArchive={archiveCurrentChapter}
+        secondaryAction={
+          isReady && allChaptersArchived ? (
+            <Link
+              className="primary-button"
+              href={buildVenueHref(`/projects/${projectId}/export`, venueId)}
+            >
+              所有章节已存档，去看完整全文
+            </Link>
+          ) : (
+            <button className="secondary-button" disabled type="button">
+              {isReady
+                ? `还需存档 ${chapters.length - archivedChapterCount} 章后再进入全文预览`
+                : "正在读取本地存档..."}
+            </button>
+          )
+        }
+        title="这一章定下来后，要留一个可回退的版本节点"
+      />
+
+      <VersionHistoryPanel
+        currentFingerprint={activeFingerprint}
+        description="这里保存的是当前章节曾经确认过的正文版本。回滚后，系统会把这一版正文重新放回编辑区，并重新跑一次自检。"
+        error={historyError}
+        loading={historyLoading}
+        onRestore={restoreVersion}
+        title={`${activeChapter.title} 的历史记录`}
+        versions={versions}
+      />
     </div>
   );
 }

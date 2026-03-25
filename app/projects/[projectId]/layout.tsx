@@ -24,24 +24,19 @@ export default async function ProjectLayout({
   }
 
   return (
-    <main className="project-layout">
-      <aside className="project-sidebar">
-        <Link className="sidebar-home" href="/">
-          返回项目首页
-        </Link>
-        <div className="sidebar-project">
-          <span className="eyebrow">当前项目</span>
-          <h1>{project.title}</h1>
-          <p>{project.subtitle}</p>
+    <main className="project-shell">
+      <section className="project-summary">
+        <div className="project-summary__top">
+          <Link className="sidebar-home" href="/">
+            返回项目首页
+          </Link>
           <StatusBadge tone="amber">{project.stage}</StatusBadge>
         </div>
-        <ProjectNav projectId={project.id} />
-      </aside>
-
-      <section className="project-main">
-        <div className="project-hero">
+        <div className="project-summary__body">
           <div>
-            <VenueHeaderInfo />
+            <span className="eyebrow">当前项目</span>
+            <h1>{project.title}</h1>
+            <p>{project.subtitle}</p>
           </div>
           <div className="hero-actions">
             <span className="ghost-chip">主题方向已确定</span>
@@ -51,15 +46,32 @@ export default async function ProjectLayout({
             </span>
           </div>
         </div>
-
+        <div className="project-hero">
+          <div>
+            <VenueHeaderInfo />
+          </div>
+        </div>
         <div className="progress-card">
           {project.progress.map((item) => (
             <ProgressStrip key={item.label} label={item.label} value={item.value} />
           ))}
         </div>
+      </section>
 
+      <section className="project-main">
+        <section className="content-card content-card--soft project-nav-shell">
+          <div className="card-heading card-heading--stack">
+            <span className="eyebrow">流程导航</span>
+            <h3>一步一屏，按顺序推进</h3>
+          </div>
+          <ProjectNav projectId={project.id} />
+        </section>
         {children}
       </section>
+
+      <div className="mobile-project-dock" aria-hidden="false">
+        <ProjectNav projectId={project.id} variant="dock" />
+      </div>
     </main>
   );
 }

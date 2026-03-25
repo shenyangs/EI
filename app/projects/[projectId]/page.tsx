@@ -23,12 +23,15 @@ export default async function ProjectOverviewPage({
   }
 
   return (
-    <div className="project-page-grid">
-      <section className="content-card content-card--wide">
+    <div className="workbench-stack">
+      <section className="content-card content-card--accent">
         <div className="card-heading card-heading--stack">
-          <span className="eyebrow">第一步</span>
-          <h3>先定清题目边界，再继续后面的写作。</h3>
+          <span className="eyebrow">当前总览</span>
+          <h3>先看清现在在哪一步，再决定下一步做什么。</h3>
         </div>
+        <p className="lead-text">
+          这个项目已经绑定了目标会议和研究方向。移动版首页把“下一步”和“当前风险”拆开显示，避免你一进来就被过多细节打断。
+        </p>
         <div className="metric-grid">
           <div className="metric-card">
             <span>目标会议</span>
@@ -45,18 +48,18 @@ export default async function ProjectOverviewPage({
         </div>
         <div className="button-row top-gap">
           <Link className="secondary-button" href={buildVenueHref(`/projects/${project.id}/profile`, venue)}>
-            去看题目类型方案
+            先看题目类型方案
           </Link>
           <Link className="primary-button" href={buildVenueHref(`/projects/${project.id}/outline`, venue)}>
-            直接看论文框架包
+            继续到论文框架
           </Link>
         </div>
       </section>
 
-      <section className="content-card content-card--wide">
+      <section className="content-card">
         <div className="card-heading card-heading--stack">
           <span className="eyebrow">主流程</span>
-          <h3>按这 5 步推进，不要跳着写。</h3>
+          <h3>现在该沿这 5 步往前走</h3>
         </div>
         <div className="outline-list">
           {project.flowSteps.map((step, index) => (
@@ -82,34 +85,36 @@ export default async function ProjectOverviewPage({
 
       <VenueProfileSummary venue={venueProfile} />
 
-      <section className="content-card">
-        <div className="card-heading">
-          <span className="eyebrow">推荐方法</span>
-          <h3>当前建议的方法组合</h3>
-        </div>
-        <div className="stack-list">
-          {project.methodology.map((item) => (
-            <div key={item} className="line-item">
-              <span>{item}</span>
-              <StatusBadge>{item.length > 6 ? "重点" : "基础"}</StatusBadge>
-            </div>
-          ))}
-        </div>
-      </section>
+      <div className="project-page-grid">
+        <section className="content-card">
+          <div className="card-heading card-heading--stack">
+            <span className="eyebrow">推荐方法</span>
+            <h3>当前建议的方法组合</h3>
+          </div>
+          <div className="stack-list">
+            {project.methodology.map((item) => (
+              <div key={item} className="line-item">
+                <span>{item}</span>
+                <StatusBadge>{item.length > 6 ? "重点" : "基础"}</StatusBadge>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="content-card">
+          <div className="card-heading card-heading--stack">
+            <span className="eyebrow">待补材料</span>
+            <h3>系统建议先补齐这些内容</h3>
+          </div>
+          <ul className="bullet-list">
+            {project.materialsNeeded.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        </section>
+      </div>
 
       <section className="content-card">
-        <div className="card-heading">
-          <span className="eyebrow">待补材料</span>
-          <h3>系统建议先补齐这些内容</h3>
-        </div>
-        <ul className="bullet-list">
-          {project.materialsNeeded.map((item) => (
-            <li key={item}>{item}</li>
-          ))}
-        </ul>
-      </section>
-
-      <section className="content-card content-card--wide">
         <div className="card-heading">
           <span className="eyebrow">高风险提醒</span>
           <h3>这些问题会影响后面的写作质量和导出检查。</h3>
