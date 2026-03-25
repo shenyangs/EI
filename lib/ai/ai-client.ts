@@ -124,6 +124,16 @@ async function requestModel(
     const text = await response.text();
 
     if (!response.ok) {
+      // 处理特定的HTTP错误码
+      if (response.status === 401) {
+        throw new Error('AI 服务未授权：请检查 API 密钥配置');
+      }
+      if (response.status === 429) {
+        throw new Error('AI 服务请求过于频繁，请稍后重试');
+      }
+      if (response.status >= 500) {
+        throw new Error('AI 服务暂时不可用，请稍后重试');
+      }
       throw new Error(`模型请求失败：${response.status} ${text}`);
     }
 
@@ -200,6 +210,16 @@ async function requestModel(
     });
 
     if (status < 200 || status >= 300) {
+      // 处理特定的HTTP错误码
+      if (status === 401) {
+        throw new Error('AI 服务未授权：请检查 API 密钥配置');
+      }
+      if (status === 429) {
+        throw new Error('AI 服务请求过于频繁，请稍后重试');
+      }
+      if (status >= 500) {
+        throw new Error('AI 服务暂时不可用，请稍后重试');
+      }
       throw new Error(`模型请求失败：${status} ${text}`);
     }
 

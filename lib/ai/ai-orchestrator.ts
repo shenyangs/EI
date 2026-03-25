@@ -9,7 +9,7 @@ import {
 } from './content-pipeline';
 
 export type TaskType = 'strategy' | 'content' | 'review' | 'direction';
-export type AiTaskType = TaskType;
+export type AiTaskType = TaskType | 'topic_analysis' | 'outline_generation' | 'project_initialization' | 'content_generation' | 'quality_review' | 'revision_suggestions';
 
 interface AiModuleConfig {
   id?: number;

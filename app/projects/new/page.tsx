@@ -223,8 +223,13 @@ export default function NewProjectPage() {
 
           {error && (
             <div className="field field--full">
-              <div className="auth-error">
-                {error}
+              <div className="error-message">
+                <strong>提示：</strong>{error}
+                {error.includes("未授权") && (
+                  <span className="error-hint">
+                    请检查 AI 服务配置或稍后重试
+                  </span>
+                )}
               </div>
             </div>
           )}
