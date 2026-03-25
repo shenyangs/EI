@@ -222,18 +222,72 @@ async function requestModel(
   }
 }
 
+// 从环境变量创建默认模型配置
+function createDefaultModelFromEnv(): AIModel | null {
+  const provider = process.env.AI_PROVIDER || "minimax";
+  const model = process.env.MINIMAX_MODEL || "MiniMax-M2.7";
+  const baseUrl = process.env.MINIMAX_BASE_URL || "https://api.minimaxi.com/v1";
+  const apiKey = process.env.MINIMAX_API_KEY;
+  
+  if (!apiKey) {
+    return null;
+  }
+  
+  return {
+    id: 0,
+    name: "默认模型",
+    provider,
+    model,
+    baseUrl,
+    apiKey,
+    isDefault: true,
+    createdAt: new Date().toISOString()
+  };
+}
+
+// 从环境变量创建Gemini模型配置
+function createGeminiModelFromEnv(): AIModel | null {
+  const model = process.env.GEMINI_MODEL || "gemini-pro";
+  const baseUrl = process.env.GEMINI_BASE_URL || "https://generativelanguage.googleapis.com/v1beta";
+  const apiKey = process.env.GEMINI_API_KEY;
+  
+  if (!apiKey) {
+    return null;
+  }
+  
+  return {
+    id: 0,
+    name: "Gemini",
+    provider: "google",
+    model,
+    baseUrl,
+    apiKey,
+    isDefault: false,
+    createdAt: new Date().toISOString()
+  };
+}
+
 export async function getDefaultModel(): Promise<AIModel | null> {
   try {
     const db = await getDatabase();
     const model = await db.get('SELECT * FROM ai_models WHERE isDefault = 1');
-    return model;
+    if (model) {
+      return model;
+    }
   } catch (error) {
-    console.error('Failed to get default model:', error);
-    return null;
+    console.error('Failed to get default model from database:', error);
   }
+  
+  // 如果数据库没有，使用环境变量
+  return createDefaultModelFromEnv();
 }
 
 export async function getModelById(id: number): Promise<AIModel | null> {
+  // id为0表示使用环境变量配置
+  if (id === 0) {
+    return createDefaultModelFromEnv();
+  }
+  
   try {
     const db = await getDatabase();
     const model = await db.get('SELECT * FROM ai_models WHERE id = ?', [id]);
@@ -242,6 +296,27 @@ export async function getModelById(id: number): Promise<AIModel | null> {
     console.error(`Failed to get model by id ${id}:`, error);
     return null;
   }
+}
+
+export async function getModelByProvider(provider: string): Promise<AIModel | null> {
+  try {
+    const db = await getDatabase();
+    const models = await db.all('SELECT * FROM ai_models WHERE provider = ?', [provider]);
+    if (models.length > 0) {
+      return models[0];
+    }
+  } catch (error) {
+    console.error(`Failed to get ${provider} model from database:`, error);
+  }
+  
+  // 如果数据库没有，使用环境变量
+  if (provider === 'google') {
+    return createGeminiModelFromEnv();
+  } else if (provider === 'minimax') {
+    return createDefaultModelFromEnv();
+  }
+  
+  return null;
 }
 
 export async function generatePaperDraft({

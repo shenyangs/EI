@@ -1,5 +1,5 @@
 import { getDatabase } from '@/lib/server/db';
-import { AIModel, generatePaperDraft, getDefaultModel, getModelById } from '@/lib/ai/ai-client';
+import { AIModel, generatePaperDraft, getDefaultModel, getModelById, getModelByProvider } from '@/lib/ai/ai-client';
 import {
   generateHighQualityContent,
   reviewPaperWithQualityCheck,
@@ -9,6 +9,7 @@ import {
 } from './content-pipeline';
 
 export type TaskType = 'strategy' | 'content' | 'review' | 'direction';
+export type AiTaskType = TaskType;
 
 interface AiModuleConfig {
   id?: number;
@@ -63,17 +64,6 @@ interface OrchestratorResult {
 // 模型可用性缓存
 const modelAvailabilityCache = new Map<string, { available: boolean; lastChecked: number }>();
 const CACHE_DURATION = 60000; // 1分钟
-
-async function getModelByProvider(provider: string): Promise<AIModel | null> {
-  try {
-    const db = await getDatabase();
-    const models = await db.all('SELECT * FROM ai_models WHERE provider = ?', [provider]);
-    return models[0] || null;
-  } catch (error) {
-    console.error(`Failed to get ${provider} model:`, error);
-    return null;
-  }
-}
 
 async function isModelAvailable(model: AIModel): Promise<boolean> {
   const cacheKey = `model_${model.id}`;
@@ -210,221 +200,126 @@ export async function orchestrateAIRequest(options: OrchestratorOptions): Promis
 
       return {
         content: result.content,
-        usage: null,
-        model: {
-          id: 0,
-          name: 'quality-pipeline',
-          provider: 'pipeline'
-        },
+        usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
+        model: { id: 0, name: 'Pipeline', provider: 'internal' },
         fallback: false,
-        quality: {
-          score: result.quality.score,
-          passed: result.quality.passed,
-          iterations: result.quality.iterations,
-          selfCritique: result.metadata.selfCritique
-        }
+        quality: result.quality
       };
     } catch (error) {
-      console.error('Quality pipeline failed, falling back to standard:', error);
-      // 失败时回退到标准流程
+      console.warn('Quality pipeline failed, falling back to standard orchestration:', error);
+      // 继续执行标准流程
     }
   }
 
-  let primaryModel: AIModel | null = null;
+  // 标准AI协调流程
+  const primaryModel = await getPreferredModelForTask(taskType, options);
+
+  if (!primaryModel) {
+    throw new Error('没有可用的AI模型，请检查模型配置。');
+  }
+
+  const originalProvider = primaryModel.provider;
   let fallbackModel: AIModel | null = null;
   let usedFallback = false;
-  let originalProvider: string | undefined;
 
+  // 尝试使用首选模型
   try {
-    // 获取首选模型
-    primaryModel = await getPreferredModelForTask(taskType, options);
+    // 检查模型可用性
+    const isAvailable = await isModelAvailable(primaryModel);
     
-    if (!primaryModel) {
-      throw new Error('未找到首选模型');
-    }
-
-    originalProvider = primaryModel.provider;
-
-    // 检查首选模型可用性（快速失败）
-    const isPrimaryAvailable = await isModelAvailable(primaryModel);
-    
-    if (!isPrimaryAvailable && enableFallback) {
-      console.log(`Primary model ${primaryModel.provider} is not available, trying fallback...`);
+    if (!isAvailable && enableFallback) {
+      // 首选模型不可用，尝试备用模型
       fallbackModel = await getFallbackModelForTask(taskType);
-    }
-
-    let result;
-    let modelToUse: AIModel;
-
-    if (fallbackModel && !isPrimaryAvailable) {
-      // 使用备用模型
-      modelToUse = fallbackModel;
-      usedFallback = true;
-    } else {
-      // 使用首选模型
-      modelToUse = primaryModel;
-    }
-
-    try {
-      result = await tryGenerateWithModel(modelToUse, prompt, systemPrompt, temperature);
-    } catch (error) {
-      // 使该模型的缓存失效
-      invalidateModelCache(modelToUse.id);
       
-      if (enableFallback && modelToUse.provider === originalProvider) {
-        // 尝试使用备用模型
-        console.log(`Model ${modelToUse.provider} failed, trying fallback...`);
-        fallbackModel = fallbackModel || await getFallbackModelForTask(taskType);
+      if (fallbackModel && await isModelAvailable(fallbackModel)) {
+        const result = await tryGenerateWithModel(
+          fallbackModel,
+          prompt,
+          systemPrompt,
+          temperature
+        );
         
-        if (fallbackModel) {
-          modelToUse = fallbackModel;
-          usedFallback = true;
-          result = await tryGenerateWithModel(modelToUse, prompt, systemPrompt, temperature);
-        } else {
-          throw error;
-        }
-      } else {
-        throw error;
+        usedFallback = true;
+        invalidateModelCache(primaryModel.id);
+
+        return {
+          content: result.content,
+          usage: result.usage,
+          model: {
+            id: fallbackModel.id,
+            name: fallbackModel.name,
+            provider: fallbackModel.provider
+          },
+          fallback: true,
+          originalProvider
+        };
       }
     }
 
-    return {
-      content: result.content,
-      usage: result.usage,
-      model: {
-        id: modelToUse.id,
-        name: modelToUse.name,
-        provider: modelToUse.provider
-      },
-      fallback: usedFallback,
-      originalProvider
-    };
-
-  } catch (error) {
-    // 所有尝试都失败，使用默认模型
-    console.error('All model attempts failed, trying default model...');
-    const defaultModel = await getDefaultModel();
-    
-    if (!defaultModel) {
-      throw new Error('未配置AI模型，请先在后台添加模型配置。');
-    }
-
-    const result = await tryGenerateWithModel(defaultModel, prompt, systemPrompt, temperature);
+    // 使用首选模型生成
+    const result = await tryGenerateWithModel(
+      primaryModel,
+      prompt,
+      systemPrompt,
+      temperature
+    );
 
     return {
       content: result.content,
       usage: result.usage,
       model: {
-        id: defaultModel.id,
-        name: defaultModel.name,
-        provider: defaultModel.provider
+        id: primaryModel.id,
+        name: primaryModel.name,
+        provider: primaryModel.provider
       },
-      fallback: true,
-      originalProvider
-    };
-  }
-}
-
-// ==================== 新的高质量内容生成方法 ====================
-
-/**
- * 生成高质量研究方向（使用新Prompt系统）
- * 
- * 示例：
- * ```typescript
- * const result = await generateDirectionEnhanced(
- *   "智能服饰的用户体验研究",
- *   ["智能服饰", "用户体验", "可穿戴设备"],
- *   { targetVenue: "IEEE ICCCI", userLevel: "master" }
- * );
- * ```
- */
-export async function generateDirectionEnhanced(
-  topic: string,
-  keywords: string[],
-  options?: {
-    field?: string;
-    targetVenue?: string;
-    userLevel?: PromptContext['userLevel'];
-    domain?: PromptContext['domain'];
-  }
-) {
-  const result = await generateHighQualityContent(topic, keywords, {
-    domain: options?.domain,
-    targetVenue: options?.targetVenue,
-    userLevel: options?.userLevel
-  });
-
-  return {
-    content: result.content,
-    quality: result.quality,
-    metadata: result.metadata
-  };
-}
-
-/**
- * 评审论文（使用新Prompt系统）
- * 
- * 示例：
- * ```typescript
- * const result = await reviewContentEnhanced(
- *   paperContent,
- *   { domain: "smart-clothing", targetVenue: "IEEE ICCCI" }
- * );
- * ```
- */
-export async function reviewContentEnhanced(
-  content: string,
-  options: {
-    domain: PromptContext['domain'];
-    targetVenue?: string;
-    userLevel?: PromptContext['userLevel'];
-  }
-) {
-  const context: PromptContext = {
-    domain: options.domain,
-    researchType: 'experimental',
-    topic: '论文评审',
-    keywords: [],
-    targetVenue: options.targetVenue,
-    userLevel: options.userLevel || 'phd',
-    language: 'zh',
-    depth: 'expert',
-    creativity: 'balanced'
-  };
-
-  const result = await reviewPaperWithQualityCheck(content, context);
-
-  return {
-    content: result.content,
-    quality: result.quality,
-    metadata: result.metadata
-  };
-}
-
-// ==================== 兼容旧版本的便捷方法 ====================
-
-// 旧版本：生成研究方向（保持兼容）
-export async function generateDirection(topic: string, field?: string, modelId?: number) {
-  // 尝试使用新系统，失败时回退到旧系统
-  try {
-    const keywords = topic.split(/[\s,，]+/).filter(k => k.length > 1);
-    const result = await generateDirectionEnhanced(topic, keywords, {
-      field,
-      userLevel: 'master'
-    });
-    
-    return {
-      content: result.content,
-      usage: null,
-      model: { id: 0, name: 'quality-pipeline', provider: 'pipeline' },
       fallback: false
     };
   } catch (error) {
-    console.warn('New pipeline failed, using legacy:', error);
+    console.error(`Primary model ${primaryModel.name} failed:`, error);
+    invalidateModelCache(primaryModel.id);
+
+    if (!enableFallback) {
+      throw error;
+    }
+
+    // 尝试备用模型
+    fallbackModel = fallbackModel || await getFallbackModelForTask(taskType);
     
-    // 回退到旧实现
-    const systemPrompt = `你是一个面向服装、设计、时尚、人文社科与技术交叉研究的学术方向顾问。基于用户提供的主题，生成3-5个具体的研究方向，每个方向包括：
+    if (!fallbackModel) {
+      throw new Error('没有可用的备用模型。');
+    }
+
+    try {
+      const result = await tryGenerateWithModel(
+        fallbackModel,
+        prompt,
+        systemPrompt,
+        temperature
+      );
+
+      usedFallback = true;
+
+      return {
+        content: result.content,
+        usage: result.usage,
+        model: {
+          id: fallbackModel.id,
+          name: fallbackModel.name,
+          provider: fallbackModel.provider
+        },
+        fallback: true,
+        originalProvider
+      };
+    } catch (fallbackError) {
+      console.error(`Fallback model ${fallbackModel.name} also failed:`, fallbackError);
+      throw new Error('所有可用模型都失败了，请检查模型配置和网络连接。');
+    }
+  }
+}
+
+// 特定任务的便捷方法
+export async function generateDirection(topic: string, field?: string, modelId?: number) {
+  const systemPrompt = `你是一个面向服装、设计、时尚、人文社科与技术交叉研究的学术方向顾问。基于用户提供的主题，生成3-5个具体的研究方向，每个方向包括：
 1. 方向名称
 2. 简要描述（1-2句话）
 3. 研究价值
@@ -432,39 +327,20 @@ export async function generateDirection(topic: string, field?: string, modelId?:
 
 输出必须结构清晰、学术表达克制，不要输出思考过程。`;
 
-    const prompt = `请为主题"${topic}"${field ? ` 在${field}领域` : ''}生成具体的研究方向建议。`;
+  const prompt = `请为主题"${topic}"${field ? ` 在${field}领域` : ''}生成具体的研究方向建议。`;
 
-    return orchestrateAIRequest({
-      taskType: 'direction',
-      prompt,
-      systemPrompt,
-      temperature: 0.7,
-      geminiModelId: modelId,
-      enableFallback: true
-    });
-  }
+  return orchestrateAIRequest({
+    taskType: 'direction',
+    prompt,
+    systemPrompt,
+    temperature: 0.7,
+    geminiModelId: modelId,
+    enableFallback: true
+  });
 }
 
-// 旧版本：评审内容（保持兼容）
 export async function reviewContent(content: string, modelId?: number) {
-  // 尝试使用新系统
-  try {
-    const result = await reviewContentEnhanced(content, {
-      domain: 'fashion-design',
-      userLevel: 'phd'
-    });
-    
-    return {
-      content: result.content,
-      usage: null,
-      model: { id: 0, name: 'quality-pipeline', provider: 'pipeline' },
-      fallback: false
-    };
-  } catch (error) {
-    console.warn('New pipeline failed, using legacy:', error);
-    
-    // 回退到旧实现
-    const systemPrompt = `你是一个面向服装、设计、时尚、人文社科与技术交叉研究的学术论文评审专家。请对用户提供的稿件进行全面评估，并提供具体的改进建议。评估应包括：
+  const systemPrompt = `你是一个面向服装、设计、时尚、人文社科与技术交叉研究的学术论文评审专家。请对用户提供的稿件进行全面评估，并提供具体的改进建议。评估应包括：
 1. 整体质量评分（1-10分）
 2. 主要优点
 3. 主要问题
@@ -473,20 +349,18 @@ export async function reviewContent(content: string, modelId?: number) {
 
 输出必须结构清晰、学术表达克制，不要输出思考过程。`;
 
-    const prompt = `请对以下稿件进行评审并提供改进建议：\n\n${content}`;
+  const prompt = `请对以下稿件进行评审并提供改进建议：\n\n${content}`;
 
-    return orchestrateAIRequest({
-      taskType: 'review',
-      prompt,
-      systemPrompt,
-      temperature: 0.5,
-      geminiModelId: modelId,
-      enableFallback: true
-    });
-  }
+  return orchestrateAIRequest({
+    taskType: 'review',
+    prompt,
+    systemPrompt,
+    temperature: 0.5,
+    geminiModelId: modelId,
+    enableFallback: true
+  });
 }
 
-// 旧版本：生成内容（保持兼容）
 export async function generateContent(prompt: string, systemPrompt?: string, modelId?: number) {
   return orchestrateAIRequest({
     taskType: 'content',
@@ -498,163 +372,233 @@ export async function generateContent(prompt: string, systemPrompt?: string, mod
   });
 }
 
-// ==================== AiOrchestrator 类（保持兼容） ====================
-
-export type AiTaskType = TaskType;
-
-export type AiTaskContext = {
-  projectId: string;
-  projectTitle: string;
-  venueId: string;
-  currentStep: string;
-  previousSteps: Array<{ step: string; data: any }>;
-  userInputs: Record<string, any>;
-};
-
-export type AiTaskResult = {
-  content: string;
-  metadata?: {
-    topics?: string[];
-    directions?: any[];
-  };
-  quality?: {
-    overallScore: number;
-    approved: boolean;
-    criteria: Array<{
-      name: string;
-      score: number;
-      feedback: string;
-    }>;
-    suggestions: string[];
-  };
-  nextSteps?: Array<{
-    step: string;
-    estimatedTime: number;
-    preview: string;
-  }>;
-};
-
-function getDefaultSuggestions() {
-  return [
-    {
-      section: "引言",
-      issue: "研究背景描述不够充分",
-      suggestion: "建议补充更多关于研究领域的背景信息",
-      severity: "medium"
-    },
-    {
-      section: "方法",
-      issue: "研究方法描述过于简略",
-      suggestion: "建议详细说明数据收集和分析方法",
-      severity: "high"
-    }
-  ];
+// 新增：高质量内容生成方法
+export async function generateHighQualityDirection(
+  topic: string,
+  context: Partial<PromptContext>
+) {
+  const pipeline = new ContentGenerationPipeline();
+  return await pipeline.generate(
+    context as PromptContext,
+    'direction'
+  );
 }
 
+export async function generateHighQualityReview(
+  content: string,
+  context: Partial<PromptContext>
+) {
+  const pipeline = new ContentGenerationPipeline();
+  return await pipeline.generate(
+    context as PromptContext,
+    'review',
+    content
+  );
+}
+
+export async function generateHighQualityPaperContent(
+  context: PromptContext
+) {
+  const pipeline = new ContentGenerationPipeline();
+  return await pipeline.generate(context, 'content');
+}
+
+// 新增：智能内容路由
+export function createSmartRouter() {
+  return new SmartContentRouter();
+}
+
+// 新增：增强版研究方向生成
+export async function generateDirectionEnhanced(
+  topic: string,
+  keywords: string[],
+  options: {
+    domain?: PromptContext["domain"];
+    targetVenue?: string;
+    userLevel?: PromptContext["userLevel"];
+  } = {}
+) {
+  const promptContext: PromptContext = {
+    domain: options.domain || "fashion-design",
+    researchType: "experimental",
+    topic,
+    keywords,
+    userLevel: options.userLevel || "master",
+    language: "zh",
+    depth: "detailed",
+    creativity: "balanced",
+  };
+
+  const pipeline = new ContentGenerationPipeline();
+  const result = await pipeline.generate(promptContext, "direction");
+
+  return {
+    content: result.content,
+    quality: result.quality || {
+      score: 7,
+      passed: true,
+      iterations: 1,
+    },
+    metadata: {
+      domain: promptContext.domain,
+      generationTime: Date.now(),
+    },
+  };
+}
+
+// 新增：增强版内容评审
+export async function reviewContentEnhanced(
+  content: string,
+  options: {
+    domain?: PromptContext["domain"];
+    targetVenue?: string;
+    userLevel?: PromptContext["userLevel"];
+  } = {}
+) {
+  const promptContext: PromptContext = {
+    domain: options.domain || "fashion-design",
+    researchType: "experimental",
+    topic: "",
+    keywords: [],
+    userLevel: options.userLevel || "master",
+    language: "zh",
+    depth: "detailed",
+    creativity: "balanced",
+  };
+
+  const pipeline = new ContentGenerationPipeline();
+  const result = await pipeline.generate(promptContext, "review", content);
+
+  return {
+    content: result.content,
+    quality: result.quality || {
+      score: 7,
+      passed: true,
+      iterations: 1,
+    },
+    metadata: {
+      domain: promptContext.domain,
+      generationTime: Date.now(),
+    },
+  };
+}
+
+// 任务上下文
+export interface AiTaskContext {
+  projectTitle: string;
+  currentStep: string;
+  currentChapter?: string;
+  chapterGoal?: string;
+}
+
+// 新增：AI编排器类（用于向后兼容）
 export class AiOrchestrator {
-  static async runTask(taskType: AiTaskType, context: AiTaskContext): Promise<AiTaskResult> {
-    // 尝试使用新系统
-    try {
-      const router = new SmartContentRouter();
-      const keywords = context.projectTitle.split(/[\s,，]+/).filter(k => k.length > 1);
-      
-      const promptContext = await router.detectOptimalContext(
-        context.projectTitle,
-        keywords,
-        context.userInputs?.description
-      );
-
-      const pipeline = new ContentGenerationPipeline();
-      const result = await pipeline.generate(promptContext, taskType as 'direction' | 'content');
-
-      // 解析主题
-      const topics = result.content
-        .match(/\b(?:智能服饰|传统纹样|用户体验|交互设计|非遗文化|数字化|创新设计|研究方法|文献综述|研究结果|讨论|结论)\b/gi)
-        ?.filter((value, index, self) => self.indexOf(value) === index)
-        ?.map(topic => topic.toLowerCase()) || [];
-
-      return {
-        content: result.content,
-        metadata: {
-          topics: topics.length > 0 ? topics : ["研究主题", "研究方法", "创新点"]
-        },
-        quality: {
-          overallScore: result.quality.score * 10,
-          approved: result.quality.passed,
-          criteria: [
-            { name: "内容具体性", score: result.quality.score * 10, feedback: result.quality.feedback[0] || "评估完成" },
-            { name: "领域针对性", score: result.quality.score * 10, feedback: result.quality.feedback[1] || "符合领域规范" },
-            { name: "学术规范性", score: result.quality.score * 10, feedback: result.quality.feedback[2] || "结构清晰" }
-          ],
-          suggestions: result.quality.feedback.slice(0, 3)
-        },
-        nextSteps: [
-          { step: "完善大纲", estimatedTime: 10, preview: "根据生成的内容完善论文大纲" },
-          { step: "撰写正文", estimatedTime: 30, preview: "基于大纲撰写各章节内容" }
-        ]
-      };
-    } catch (error) {
-      console.warn('New pipeline failed in AiOrchestrator, using legacy:', error);
-      
-      // 回退到旧实现
-      const systemPrompt = `你是一个专业的EI论文写作助手，擅长为服装、设计、时尚、人文社科与技术交叉研究领域生成高质量的学术内容。
-
-当前任务类型：${taskType}
-项目标题：${context.projectTitle}
-当前步骤：${context.currentStep}
-
-请根据上下文生成高质量的内容。`;
-
-      const prompt = `任务类型：${taskType}
-
-项目信息：
-- 项目ID：${context.projectId}
-- 项目标题：${context.projectTitle}
-- 会议ID：${context.venueId}
-
-当前步骤：${context.currentStep}
-
-用户输入：
-${Object.entries(context.userInputs).map(([key, value]) => `${key}: ${value}`).join('\n')}
-
-请生成内容。`;
-
-      const result = await orchestrateAIRequest({
-        taskType: taskType as TaskType,
-        prompt,
-        systemPrompt,
-        temperature: 0.5,
-        enableFallback: true
-      });
-
-      const content = result.content;
-      
-      const topics = content
-        .match(/\b(?:智能服饰|传统纹样|用户体验|交互设计|非遗文化|数字化|创新设计|研究方法|文献综述|研究结果|讨论|结论)\b/gi)
-        ?.filter((value, index, self) => self.indexOf(value) === index)
-        ?.map(topic => topic.toLowerCase()) || [];
-
-      return {
-        content: content,
-        metadata: {
-          topics: topics.length > 0 ? topics : ["研究主题", "研究方法", "创新点"]
-        },
-        quality: {
-          overallScore: 85,
-          approved: true,
-          criteria: [
-            { name: "学术性", score: 85, feedback: "内容符合学术规范" },
-            { name: "逻辑性", score: 80, feedback: "结构清晰，逻辑连贯" },
-            { name: "完整性", score: 85, feedback: "内容完整，覆盖主要要点" }
-          ],
-          suggestions: ["可以进一步细化研究方法", "建议补充更多实证数据"]
-        },
-        nextSteps: [
-          { step: "完善大纲", estimatedTime: 10, preview: "根据生成的内容完善论文大纲" },
-          { step: "撰写正文", estimatedTime: 30, preview: "基于大纲撰写各章节内容" }
-        ]
-      };
+  static async runTask(
+    taskType: string,
+    content: string,
+    context: AiTaskContext,
+    options?: {
+      modelId?: number;
+      temperature?: number;
     }
+  ) {
+    switch (taskType) {
+      case 'topic_analysis':
+        return this.analyzeTopic(content, context);
+      case 'content_generation':
+        return this.generateContent(content, context, options);
+      case 'quality_review':
+        return this.reviewQuality(content, context);
+      case 'revision_suggestions':
+        return this.generateRevisionSuggestions(content, { score: 7, passed: true, iterations: 1 }, context);
+      default:
+        throw new Error(`Unknown task type: ${taskType}`);
+    }
+  }
+
+  static async analyzeTopic(topic: string, context: AiTaskContext) {
+    // 使用新系统分析主题
+    const promptContext: PromptContext = {
+      domain: 'fashion-design',
+      researchType: 'experimental',
+      topic,
+      keywords: topic.split(/[\s,，]+/).filter(k => k.length > 1),
+      userLevel: 'master',
+      language: 'zh',
+      depth: 'detailed',
+      creativity: 'balanced'
+    };
+
+    const pipeline = new ContentGenerationPipeline();
+    const result = await pipeline.generate(promptContext, 'direction');
+
+    return {
+      ok: true,
+      data: {
+        keywords: promptContext.keywords,
+        outline: result.content,
+        suggestions: result.quality?.feedback?.length
+          ? result.quality.feedback
+          : ['建议进一步细化研究方向']
+      }
+    };
+  }
+
+  static async generateContent(
+    prompt: string,
+    context: AiTaskContext,
+    options?: { modelId?: number; temperature?: number }
+  ) {
+    // 使用新系统生成内容
+    const promptContext: PromptContext = {
+      domain: 'fashion-design',
+      researchType: 'experimental',
+      topic: context.projectTitle,
+      keywords: context.projectTitle.split(/[\s,，]+/).filter(k => k.length > 1),
+      userLevel: 'master',
+      language: 'zh',
+      depth: 'detailed',
+      creativity: 'balanced'
+    };
+
+    const pipeline = new ContentGenerationPipeline();
+    const result = await pipeline.generate(promptContext, 'content', prompt);
+
+    return {
+      ok: true,
+      data: {
+        content: result.content,
+        quality: result.quality
+      }
+    };
+  }
+
+  static async reviewQuality(content: string, context: AiTaskContext) {
+    // 使用新系统进行质量评审
+    const promptContext: PromptContext = {
+      domain: 'fashion-design',
+      researchType: 'experimental',
+      topic: context.projectTitle,
+      keywords: context.projectTitle.split(/[\s,，]+/).filter(k => k.length > 1),
+      userLevel: 'master',
+      language: 'zh',
+      depth: 'detailed',
+      creativity: 'balanced'
+    };
+
+    const pipeline = new ContentGenerationPipeline();
+    const result = await pipeline.generate(promptContext, 'review', content);
+
+    return {
+      ok: true,
+      data: {
+        quality: result.quality || { score: 7, passed: true, iterations: 1 },
+        suggestions: result.content
+          .split('\n')
+          .filter(line => line.trim())
+          .slice(0, 5)
+      }
+    };
   }
 
   static async generateRevisionSuggestions(content: string, quality: any, context: AiTaskContext): Promise<any[]> {
@@ -737,12 +681,36 @@ ${JSON.stringify(quality, null, 2)}
       return getDefaultSuggestions();
     }
   }
+
+  static async generateWorkPlan(context: AiTaskContext) {
+    // 生成工作计划
+    return {
+      ok: true,
+      data: {
+        steps: [
+          { step: "确定研究方向", estimatedTime: 15, preview: "分析主题并确定研究角度" },
+          { step: "文献调研", estimatedTime: 30, preview: "搜索相关文献并整理参考" },
+          { step: "撰写大纲", estimatedTime: 20, preview: "构建论文整体结构框架" },
+          { step: "撰写正文", estimatedTime: 30, preview: "基于大纲撰写各章节内容" }
+        ]
+      }
+    };
+  }
 }
 
-// 导出新的高质量生成函数
-export {
-  generateHighQualityContent,
-  reviewPaperWithQualityCheck,
-  ContentGenerationPipeline,
-  SmartContentRouter
-};
+function getDefaultSuggestions() {
+  return [
+    {
+      section: "引言",
+      issue: "研究背景描述不够充分",
+      suggestion: "建议补充更多关于研究领域的背景信息",
+      severity: "medium"
+    },
+    {
+      section: "方法",
+      issue: "研究方法描述过于简略",
+      suggestion: "建议详细说明数据收集和分析方法",
+      severity: "high"
+    }
+  ];
+}

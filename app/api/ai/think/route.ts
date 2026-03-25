@@ -3,6 +3,7 @@ import { AiOrchestrator, AiTaskType, AiTaskContext } from "@/lib/ai/ai-orchestra
 
 type ThinkRequest = {
   taskType: AiTaskType;
+  content: string;
   context: AiTaskContext;
 };
 
@@ -21,11 +22,11 @@ export async function POST(request: Request) {
     );
   }
 
-  if (!body.taskType || !body.context) {
+  if (!body.taskType || !body.content || !body.context) {
     return NextResponse.json(
       {
         ok: false,
-        error: "缺少必要的任务类型和上下文信息。"
+        error: "缺少必要的任务类型、内容和上下文信息。"
       },
       { status: 400 }
     );
@@ -33,7 +34,7 @@ export async function POST(request: Request) {
 
   try {
     // 运行AI思考和内容生成流程
-    const result = await AiOrchestrator.runTask(body.taskType, body.context);
+    const result = await AiOrchestrator.runTask(body.taskType, body.content, body.context);
 
     return NextResponse.json({
       ok: true,
