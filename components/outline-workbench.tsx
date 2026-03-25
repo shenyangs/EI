@@ -106,8 +106,11 @@ export function OutlineWorkbench({
       setLoading(true);
       
       const generateOutline = async () => {
+        let timeoutId: NodeJS.Timeout | null = null;
+        
         try {
-          const response = await fetch("/api/ai/think", {
+          // 准备请求选项
+          const requestOptions: RequestInit = {
             method: "POST",
             headers: {
               "Content-Type": "application/json"
@@ -127,7 +130,24 @@ export function OutlineWorkbench({
                 }
               }
             })
-          });
+          };
+          
+          // 如果支持 AbortController，添加超时控制
+          if (typeof AbortController !== "undefined") {
+            const controller = new AbortController();
+            timeoutId = setTimeout(() => controller.abort(), 30000); // 30秒超时
+            requestOptions.signal = controller.signal;
+          }
+          
+          const response = await fetch("/api/ai/think", requestOptions);
+          
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+          }
+
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
 
           const data = await response.json();
 

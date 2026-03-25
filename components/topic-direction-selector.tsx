@@ -54,8 +54,10 @@ export function TopicDirectionSelector({
       setLoading(true);
       
       const fetchDirections = async () => {
+        let timeoutId: NodeJS.Timeout | null = null;
+        
         try {
-          const response = await fetch("/api/ai/think", {
+          const requestOptions: RequestInit = {
             method: "POST",
             headers: {
               "Content-Type": "application/json"
@@ -73,7 +75,23 @@ export function TopicDirectionSelector({
                 }
               }
             })
-          });
+          };
+          
+          if (typeof AbortController !== "undefined") {
+            const controller = new AbortController();
+            timeoutId = setTimeout(() => controller.abort(), 30000);
+            requestOptions.signal = controller.signal;
+          }
+          
+          const response = await fetch("/api/ai/think", requestOptions);
+          
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+          }
+
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
 
           const data = await response.json();
 
