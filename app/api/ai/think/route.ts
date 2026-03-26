@@ -552,33 +552,49 @@ async function generateProjectAnalysis(body: ThinkRequest) {
   }
 }
 
+// 从标题中提取核心词汇
+function extractCoreWordsFromTitle(title: string): string[] {
+  // 移除常见的前缀和后缀
+  let processed = title.replace(/基于|研究|理论|实践|探索|科学|技术|的|与|和/g, '');
+  // 按空格和标点分割
+  const words = processed.split(/[\s,，：:]+/).filter(word => word.length > 2);
+  return words;
+}
+
 // 生成默认研究方向文本
 function generateDefaultDirections(title: string): string {
+  // 从标题中提取核心词汇
+  const coreWords = extractCoreWordsFromTitle(title);
+  const coreText = coreWords.length > 0 ? coreWords.join('与') : '研究主题';
+  
   return `基于"${title}"的研究方向分析：
 
-1. 理论研究方向
-深入探讨相关理论基础，构建系统的理论框架。
+1. ${coreText} 理论研究
+深入探讨${coreText}相关的理论基础，构建系统的理论框架，为后续研究奠定坚实基础。
 
-2. 实证研究方向
-通过数据收集和分析，验证研究假设。
+2. ${coreText} 实证研究
+通过数据收集和分析，验证${coreText}相关的研究假设，确保研究结论的科学性和可靠性。
 
-3. 设计实践方向
-结合设计实践，探索创新解决方案。
+3. ${coreText} 设计实践
+结合${coreText}的设计实践，探索创新解决方案，推动理论成果转化应用。
 
-4. 跨学科研究方向
-融合多学科知识，拓展研究视野。
+4. ${coreText} 跨学科研究
+融合多学科知识和方法，从多角度探讨${coreText}相关问题，拓展研究视野。
 
-5. 应用研究方向
-关注实际应用价值，推动成果转化。`;
+5. ${coreText} 应用研究
+关注${coreText}的实际应用价值，探索在具体场景中的应用可能性，提升研究的实用价值。`;
 }
 
 // 获取默认研究方向数组
 function getDefaultDirections(title: string): any[] {
+  const coreWords = extractCoreWordsFromTitle(title);
+  const coreText = coreWords.length > 0 ? coreWords.join('与') : title;
+  
   return [
     {
       id: 'direction-1',
-      label: '理论研究方向',
-      description: `深入探讨"${title}"的理论基础，构建系统的理论框架，为后续研究奠定坚实基础。`,
+      label: `${coreText} 理论研究`,
+      description: `深入探讨"${coreText}"的理论基础，构建系统的理论框架，为后续研究奠定坚实基础。`,
       confidence: 90,
       whyItFits: ['理论基础扎实', '学术价值高', '研究路径清晰'],
       writingStrategy: ['系统梳理文献', '构建理论模型', '深入分析论证'],
@@ -586,8 +602,8 @@ function getDefaultDirections(title: string): any[] {
     },
     {
       id: 'direction-2',
-      label: '实证研究方向',
-      description: `通过数据收集和分析，验证"${title}"相关假设，提供实证支持。`,
+      label: `${coreText} 实证研究`,
+      description: `通过数据收集和分析，验证"${coreText}"相关假设，提供实证支持。`,
       confidence: 85,
       whyItFits: ['数据支撑有力', '结论可信度高', '实践指导性强'],
       writingStrategy: ['设计研究方案', '收集实证数据', '统计分析验证'],
@@ -595,8 +611,8 @@ function getDefaultDirections(title: string): any[] {
     },
     {
       id: 'direction-3',
-      label: '设计实践方向',
-      description: `结合设计实践，探索"${title}"的创新解决方案。`,
+      label: `${coreText} 设计实践`,
+      description: `结合设计实践，探索"${coreText}"的创新解决方案。`,
       confidence: 88,
       whyItFits: ['实践性强', '创新性高', '应用价值大'],
       writingStrategy: ['案例研究', '设计实践', '效果评估'],
@@ -604,8 +620,8 @@ function getDefaultDirections(title: string): any[] {
     },
     {
       id: 'direction-4',
-      label: '跨学科研究方向',
-      description: `融合多学科知识，从多角度探讨"${title}"。`,
+      label: `${coreText} 跨学科研究`,
+      description: `融合多学科知识，从多角度探讨"${coreText}"。`,
       confidence: 82,
       whyItFits: ['视角多元', '创新性强', '学术前沿'],
       writingStrategy: ['跨学科文献综述', '多维度分析', '综合讨论'],
@@ -613,8 +629,8 @@ function getDefaultDirections(title: string): any[] {
     },
     {
       id: 'direction-5',
-      label: '应用研究方向',
-      description: `关注"${title}"的实际应用价值，推动成果转化。`,
+      label: `${coreText} 应用研究`,
+      description: `关注"${coreText}"的实际应用价值，推动成果转化。`,
       confidence: 80,
       whyItFits: ['实用性强', '社会价值高', '推广前景好'],
       writingStrategy: ['应用场景分析', '解决方案设计', '效果验证'],
@@ -659,41 +675,44 @@ function generateDefaultOutline(title: string): string {
 
 // 生成默认项目分析
 function generateDefaultAnalysis(title: string): string {
+  const coreWords = extractCoreWordsFromTitle(title);
+  const coreText = coreWords.length > 0 ? coreWords.join('与') : '研究主题';
+  
   return `《${title}》项目可行性分析报告
 
 一、项目概述
-本项目旨在深入研究"${title}"，通过系统的理论分析和实证研究，探索该领域的核心问题和创新解决方案。
+本项目旨在深入研究"${title}"，聚焦${coreText}相关核心问题，通过系统的理论分析和实证研究，探索该领域的创新解决方案。
 
 二、可行性分析
 1. 理论可行性
-   - 相关理论基础较为成熟
+   - ${coreText}相关理论基础较为成熟
    - 研究框架清晰明确
    - 学术资源丰富
 
 2. 方法可行性
    - 研究方法科学规范
-   - 数据获取渠道畅通
+   - ${coreText}相关数据获取渠道畅通
    - 分析工具成熟可靠
 
 3. 实践可行性
-   - 应用场景明确
+   - ${coreText}应用场景明确
    - 实施条件具备
    - 预期成果可期
 
 三、创新性分析
-1. 理论创新：构建新的理论框架或拓展现有理论
+1. 理论创新：构建${coreText}相关的新的理论框架或拓展现有理论
 2. 方法创新：采用新的研究方法或改进现有方法
-3. 实践创新：提出新的解决方案或应用场景
+3. 实践创新：提出${coreText}相关的新解决方案或应用场景
 
 四、研究价值
-1. 学术价值：丰富相关领域的理论研究
-2. 实践价值：为实际应用提供指导和参考
-3. 社会价值：推动相关领域的发展和进步
+1. 学术价值：丰富${coreText}相关领域的理论研究
+2. 实践价值：为${coreText}的实际应用提供指导和参考
+3. 社会价值：推动${coreText}相关领域的发展和进步
 
 五、建议研究方向
-1. 理论研究方向：深入探讨理论基础
-2. 实证研究方向：通过数据验证假设
-3. 应用研究方向：关注实际应用价值`;
+1. ${coreText}理论研究：深入探讨理论基础
+2. ${coreText}实证研究：通过数据验证假设
+3. ${coreText}应用研究：关注实际应用价值`;
 }
 
 // 解析研究方向
