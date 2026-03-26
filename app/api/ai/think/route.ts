@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { AiOrchestrator, AiTaskType, AiTaskContext } from "@/lib/ai/ai-orchestrator";
-import { orchestrateAIRequest } from "@/lib/ai/ai-orchestrator";
+import { AiTaskType, AiTaskContext, orchestrateAIRequest, AiOrchestrator } from "@/lib/ai/ai-orchestrator";
 
 type ThinkRequest = {
   taskType: AiTaskType | 'fill_field';
@@ -251,8 +250,27 @@ async function fillField(body: ThinkRequest) {
       prompt,
       systemPrompt,
       temperature: 0.7,
-      enableFallback: false
+      enableFallback: true
     });
+
+    // 检查是否使用了默认回退内容（如果是，使用我们自己的智能默认内容）
+    if (aiResult.fallback && aiResult.model?.provider === 'default') {
+      const defaultContent = getDefaultFieldContent(field, title || "研究主题");
+      console.log(`Using smart default content for ${field}:`, defaultContent);
+      return {
+        ok: true,
+        content: {
+          content: defaultContent,
+          sections: {
+            [field]: defaultContent
+          },
+          metadata: {
+            generatedField: field,
+            isFallback: true
+          }
+        }
+      };
+    }
 
     console.log(`AI result for ${field}:`, aiResult.content);
     return {
