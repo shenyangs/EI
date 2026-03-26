@@ -156,6 +156,29 @@ export default function NewProjectPage() {
     }
   }
 
+  async function fillAllWithAi() {
+    if (!title.trim()) {
+      setError("请先输入研究主题");
+      return;
+    }
+
+    setAiFilling({ title: true, subject: true, keywords: true, description: true });
+    setError("");
+
+    try {
+      // 先填充研究对象
+      await fillWithAi("subject", subject);
+      // 再填充关键词
+      await fillWithAi("keywords", keywords);
+      // 最后填充研究描述
+      await fillWithAi("description", description);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "AI 填充失败");
+    } finally {
+      setAiFilling({});
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
@@ -313,6 +336,14 @@ export default function NewProjectPage() {
             )}
 
             <div className="form-actions">
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={fillAllWithAi}
+                disabled={Object.values(aiFilling).some(Boolean) || !title.trim()}
+              >
+                {Object.values(aiFilling).some(Boolean) ? "AI 填写中..." : "AI 一键全部填写"}
+              </button>
               <button
                 type="button"
                 className="secondary-button"

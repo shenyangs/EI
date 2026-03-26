@@ -3,6 +3,18 @@ import { memoryStore } from './db';
 import { validateToken } from '@/lib/jwt';
 import { rateLimitMiddleware, httpsRedirectMiddleware, corsMiddleware } from './security';
 
+// 超管信息
+const SUPER_ADMIN = {
+  id: 'super_admin_001',
+  email: 'admin@system.com',
+  username: 'super_admin',
+  fullName: '超级管理员',
+  userType: 'admin',
+  institution: '系统管理',
+  department: '管理部门',
+  isSuperAdmin: true
+};
+
 // 组合中间件
 export async function applyMiddlewares(request: NextRequest) {
   // 应用HTTPS重定向
@@ -38,21 +50,29 @@ export async function authMiddleware(request: NextRequest) {
   }
 
   const token = authHeader.substring(7);
-  const tokenData = validateToken(token);
-  if (!tokenData) {
-    return NextResponse.json({ error: '无效的token' }, { status: 401 });
-  }
+  
+  // 检查是否是超管 token
+  let user;
+  if (token.startsWith('super_admin_token_')) {
+    user = SUPER_ADMIN;
+  } else {
+    const tokenData = validateToken(token);
+    if (!tokenData) {
+      return NextResponse.json({ error: '无效的 token' }, { status: 401 });
+    }
 
-  // 查找用户
-  const user = memoryStore.users.find(u => u.id === tokenData.userId);
-  if (!user) {
-    return NextResponse.json({ error: '用户不存在' }, { status: 404 });
+    // 查找用户
+    user = memoryStore.users.find(u => u.id === tokenData.userId);
+    if (!user) {
+      return NextResponse.json({ error: '用户不存在' }, { status: 404 });
+    }
   }
 
   // 将用户信息添加到请求头，以便后续处理
   const response = NextResponse.next();
   response.headers.set('X-User-Id', user.id);
   response.headers.set('X-User-Type', user.userType);
+  response.headers.set('X-Is-Super-Admin', user.isSuperAdmin ? 'true' : 'false');
   
   // 添加安全相关的响应头
   response.headers.set('X-Content-Type-Options', 'nosniff');
@@ -93,7 +113,12 @@ export async function optionalAuthMiddleware(request: NextRequest) {
 }
 
 // 角色权限检查
-export function checkPermission(userType: string, requiredPermission: string): boolean {
+export function checkPermission(userType: string, requiredPermission: string, isSuperAdmin = false): boolean {
+  // 超管拥有所有权限
+  if (isSuperAdmin) {
+    return true;
+  }
+  
   // 权限映射表
   const permissions: Record<string, Record<string, boolean>> = {
     student: {
@@ -212,14 +237,16 @@ export function permissionMiddleware(requiredPermission: string) {
       return authResponse;
     }
 
-    // 获取用户类型
+    // 获取用户类型和超管标识
     const userType = request.headers.get('X-User-Type');
-    if (!userType) {
+    const isSuperAdmin = request.headers.get('X-Is-Super-Admin') === 'true';
+    
+    if (!userType && !isSuperAdmin) {
       return NextResponse.json({ error: '未授权' }, { status: 401 });
     }
 
     // 检查权限
-    if (!checkPermission(userType, requiredPermission)) {
+    if (!checkPermission(userType || 'admin', requiredPermission, isSuperAdmin)) {
       return NextResponse.json({ error: '权限不足' }, { status: 403 });
     }
 

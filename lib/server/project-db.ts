@@ -4,6 +4,8 @@ import type { ProjectVersionPayload } from '@/lib/project-version-types';
 export type Project = {
   id: string;
   title: string;
+  subject?: string;
+  keywords?: string;
   description?: string;
   createdAt: number;
   updatedAt: number;
@@ -16,8 +18,8 @@ export async function createProject(project: Omit<Project, 'id' | 'createdAt' | 
   const now = Date.now();
 
   await db.run(
-    'INSERT INTO projects (id, title, description, createdAt, updatedAt, venueId) VALUES (?, ?, ?, ?, ?, ?)',
-    [id, project.title, project.description, now, now, project.venueId]
+    'INSERT INTO projects (id, title, subject, keywords, description, createdAt, updatedAt, venueId) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    [id, project.title, project.subject, project.keywords, project.description, now, now, project.venueId]
   );
 
   return await getProject(id);

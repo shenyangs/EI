@@ -3,9 +3,8 @@ import Link from "next/link";
 
 import { ConnectionLights } from "@/components/connection-lights";
 import { AuthNav } from "@/components/auth-nav";
-import { ThemeToggle } from "@/components/theme-toggle";
+import SimpleDevTools from "@/components/dev/SimpleDevTools";
 import { fallbackStyles } from "@/lib/fallback-styles";
-import { getAiCapabilitySnapshot } from "@/lib/ai-runtime";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -33,7 +32,6 @@ export default function RootLayout({
               <p className="brand-subtitle">跨学科时尚与设计 EI 论文工作台</p>
             </div>
             <div className="site-header__panel">
-              <ThemeToggle />
               <AuthNav />
               <ConnectionLights
                 initialModelConnected={false}
@@ -43,6 +41,9 @@ export default function RootLayout({
           </header>
           {children}
         </div>
+        
+        {/* 一键超管工具 */}
+        <SimpleDevTools />
       </body>
     </html>
   );

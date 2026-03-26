@@ -39,20 +39,20 @@ export class ValidationAppError extends AppError {
 }
 
 export class AuthenticationError extends AppError {
-  constructor(message: string = 'Authentication required') {
+  constructor(message: string = '请先登录') {
     super(message, ErrorType.AUTHENTICATION_ERROR, 401);
   }
 }
 
 export class AuthorizationError extends AppError {
-  constructor(message: string = 'Access denied') {
+  constructor(message: string = '无权访问') {
     super(message, ErrorType.AUTHORIZATION_ERROR, 403);
   }
 }
 
 export class NotFoundError extends AppError {
   constructor(resource: string) {
-    super(`${resource} not found`, ErrorType.NOT_FOUND_ERROR, 404);
+    super(`${resource}不存在`, ErrorType.NOT_FOUND_ERROR, 404);
   }
 }
 
@@ -64,14 +64,14 @@ export class ConflictError extends AppError {
 
 export class RateLimitError extends AppError {
   constructor(retryAfter: number) {
-    super('Rate limit exceeded', ErrorType.RATE_LIMIT_ERROR, 429, { retryAfter });
+    super('操作过于频繁，请稍后再试', ErrorType.RATE_LIMIT_ERROR, 429, { retryAfter });
   }
 }
 
 export class ExternalServiceError extends AppError {
   constructor(service: string, message: string) {
     super(
-      `External service error: ${service}`,
+      `服务暂时不可用：${service}`,
       ErrorType.EXTERNAL_SERVICE_ERROR,
       502,
       { service, message }
@@ -93,7 +93,7 @@ export interface ErrorResponse {
   };
 }
 
-// 生成请求ID
+// 生成请求 ID
 function generateRequestId(): string {
   return `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 }
@@ -111,13 +111,13 @@ export function handleError(error: unknown, requestId: string): NextResponse {
     statusCode = 400;
   } else if (error instanceof Error) {
     appError = new AppError(
-      error.message,
+      '系统繁忙，请稍后再试',
       ErrorType.INTERNAL_ERROR,
       500
     );
   } else {
     appError = new AppError(
-      'Unknown error occurred',
+      '发生未知错误',
       ErrorType.INTERNAL_ERROR,
       500
     );

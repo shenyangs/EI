@@ -323,6 +323,7 @@ export async function getModelByProvider(provider: string): Promise<AIModel | nu
     const db = await getDatabase();
     const models = await db.all('SELECT * FROM ai_models WHERE provider = ?', [provider]);
     if (models.length > 0) {
+      console.log(`Found ${provider} model from database:`, models[0].name);
       return models[0];
     }
   } catch (error) {
@@ -331,9 +332,13 @@ export async function getModelByProvider(provider: string): Promise<AIModel | nu
   
   // 如果数据库没有，使用环境变量
   if (provider === 'google') {
-    return createGeminiModelFromEnv();
+    const model = createGeminiModelFromEnv();
+    console.log(`Using Gemini model from env:`, model ? 'Yes' : 'No');
+    return model;
   } else if (provider === 'minimax') {
-    return createDefaultModelFromEnv();
+    const model = createDefaultModelFromEnv();
+    console.log(`Using Minimax model from env:`, model ? 'Yes' : 'No');
+    return model;
   }
   
   return null;

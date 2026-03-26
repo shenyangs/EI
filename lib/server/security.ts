@@ -205,8 +205,8 @@ export function rateLimitMiddleware(request: NextRequest) {
     
     return NextResponse.json(
       {
-        error: 'Too many requests',
-        message: 'Please try again later',
+        error: '请求过于频繁',
+        message: '请稍后再试',
         retryAfter
       },
       {
@@ -234,7 +234,7 @@ export function csrfMiddleware(request: NextRequest) {
   const origin = request.headers.get('origin');
   const referer = request.headers.get('referer');
   
-  // 检查Origin头
+  // 检查 Origin 头
   if (!origin) {
     logger.warn('CSRF check failed: Missing origin header', {
       path: request.nextUrl.pathname,
@@ -242,12 +242,12 @@ export function csrfMiddleware(request: NextRequest) {
     });
     
     return NextResponse.json(
-      { error: 'CSRF validation failed' },
+      { error: '安全验证失败' },
       { status: 403 }
     );
   }
   
-  // 验证Origin是否在允许列表中
+  // 验证 Origin 是否在允许列表中
   if (!ALLOWED_ORIGINS.includes(origin)) {
     logger.warn('CSRF check failed: Invalid origin', {
       origin,
@@ -255,7 +255,7 @@ export function csrfMiddleware(request: NextRequest) {
     });
     
     return NextResponse.json(
-      { error: 'CSRF validation failed' },
+      { error: '安全验证失败' },
       { status: 403 }
     );
   }
@@ -276,7 +276,7 @@ export function requestSizeMiddleware(maxSize: number = 10 * 1024 * 1024) { // �
       });
       
       return NextResponse.json(
-        { error: 'Request entity too large' },
+        { error: '请求内容过大' },
         { status: 413 }
       );
     }

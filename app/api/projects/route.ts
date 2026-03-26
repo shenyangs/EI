@@ -23,6 +23,8 @@ export async function POST(request: NextRequest) {
 
   let body: {
     title: string;
+    subject?: string;
+    keywords?: string;
     description?: string;
     venueId?: string;
   };
@@ -52,6 +54,8 @@ export async function POST(request: NextRequest) {
   try {
     const project = await createProject({
       title: body.title,
+      subject: body.subject,
+      keywords: body.keywords,
       description: body.description,
       venueId: body.venueId
     });

@@ -86,7 +86,7 @@ const ToastContainer: React.FC<{ toasts: Toast[]; onHide: (id: string) => void }
   );
 };
 
-// 单个Toast组件
+// 单个 Toast 组件
 const ToastItem: React.FC<{ toast: Toast; onHide: () => void }> = ({ toast, onHide }) => {
   const icons = {
     success: '✓',
@@ -102,6 +102,15 @@ const ToastItem: React.FC<{ toast: Toast; onHide: () => void }> = ({ toast, onHi
     warning: '#f59e0b',
     info: '#3b82f6',
     loading: '#6b7280'
+  };
+
+  // Toast 标题映射
+  const titleMap: Record<ToastType, string> = {
+    success: '操作成功',
+    error: '操作失败',
+    warning: '温馨提示',
+    info: '提示信息',
+    loading: '处理中'
   };
 
   return (
@@ -135,7 +144,7 @@ const ToastItem: React.FC<{ toast: Toast; onHide: () => void }> = ({ toast, onHi
       
       <div className="toast-content" style={{ flex: 1 }}>
         <div className="toast-title" style={{ fontWeight: 600, marginBottom: '4px' }}>
-          {toast.title}
+          {toast.title || titleMap[toast.type]}
         </div>
         
         {toast.message && (

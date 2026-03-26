@@ -2,6 +2,8 @@
 export interface Project {
   id: string;
   title: string;
+  subject: string;
+  keywords: string;
   description: string;
   createdAt: string;
   updatedAt: string;
@@ -153,10 +155,12 @@ class SqlExecutor {
 
   // 处理INSERT INTO projects
   private handleInsertProjects(params?: any[]): void {
-    const [id, title, description, createdAt, updatedAt, venueId] = params || [];
+    const [id, title, subject, keywords, description, createdAt, updatedAt, venueId] = params || [];
     this.store.projects.push({
       id,
       title,
+      subject,
+      keywords,
       description,
       createdAt,
       updatedAt,

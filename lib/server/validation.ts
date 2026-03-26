@@ -19,80 +19,80 @@ export class ValidationError extends Error {
 export const ValidationSchemas = {
   // 用户相关
   email: z.string()
-    .email('Invalid email format')
-    .min(5, 'Email too short')
-    .max(254, 'Email too long')
+    .email('邮箱格式不正确')
+    .min(5, '邮箱地址过短')
+    .max(254, '邮箱地址过长')
     .transform(val => val.toLowerCase().trim()),
 
   password: z.string()
-    .min(8, 'Password must be at least 8 characters')
-    .max(128, 'Password too long')
-    .regex(/[A-Z]/, 'Password must contain uppercase letter')
-    .regex(/[a-z]/, 'Password must contain lowercase letter')
-    .regex(/[0-9]/, 'Password must contain number')
-    .regex(/[^A-Za-z0-9]/, 'Password must contain special character'),
+    .min(8, '密码长度至少 8 位')
+    .max(128, '密码长度过长')
+    .regex(/[A-Z]/, '密码必须包含大写字母')
+    .regex(/[a-z]/, '密码必须包含小写字母')
+    .regex(/[0-9]/, '密码必须包含数字')
+    .regex(/[^A-Za-z0-9]/, '密码必须包含特殊字符'),
 
   username: z.string()
-    .min(3, 'Username must be at least 3 characters')
-    .max(32, 'Username too long')
-    .regex(/^[a-zA-Z0-9_-]+$/, 'Username can only contain letters, numbers, underscores, and hyphens'),
+    .min(3, '用户名长度至少 3 位')
+    .max(32, '用户名长度过长')
+    .regex(/^[a-zA-Z0-9_-]+$/, '用户名只能包含字母、数字、下划线和连字符'),
 
   // 项目相关
   projectId: z.string()
-    .uuid('Invalid project ID format'),
+    .uuid('项目 ID 格式不正确'),
 
   projectTitle: z.string()
-    .min(1, 'Title is required')
-    .max(200, 'Title too long')
+    .min(1, '标题不能为空')
+    .max(200, '标题长度过长')
     .transform(val => sanitizeInput(val)),
 
   projectDescription: z.string()
-    .max(2000, 'Description too long')
+    .max(2000, '描述长度过长')
     .transform(val => sanitizeInput(val)),
 
-  // AI相关
+  // AI 相关
   prompt: z.string()
-    .min(1, 'Prompt is required')
-    .max(10000, 'Prompt too long')
+    .min(1, '提示内容不能为空')
+    .max(10000, '提示内容过长')
     .transform(val => sanitizeInput(val)),
 
   temperature: z.number()
-    .min(0, 'Temperature must be between 0 and 2')
-    .max(2, 'Temperature must be between 0 and 2'),
+    .min(0, '温度值必须在 0 到 2 之间')
+    .max(2, '温度值必须在 0 到 2 之间'),
 
   modelId: z.number()
-    .int('Model ID must be an integer')
-    .positive('Model ID must be positive'),
+    .int('模型 ID 必须为整数')
+    .positive('模型 ID 必须为正数'),
 
   // 内容相关
   content: z.string()
-    .min(1, 'Content is required')
-    .max(50000, 'Content too long')
+    .min(1, '内容不能为空')
+    .max(50000, '内容长度过长')
     .transform(val => sanitizeInput(val)),
 
   keywords: z.array(z.string().max(50))
-    .max(20, 'Too many keywords'),
+    .max(20, '关键词数量过多'),
 
-  // ID相关
+  // ID 相关
   id: z.string()
-    .regex(/^[a-zA-Z0-9_-]+$/, 'Invalid ID format')
-    .max(64, 'ID too long'),
+    .regex(/^[a-zA-Z0-9_-]+$/, 'ID 格式不正确')
+    .max(64, 'ID 长度过长'),
 
   // 分页相关
   page: z.number()
     .int()
-    .min(1, 'Page must be at least 1')
+    .min(1, '页码最小为 1')
     .default(1),
 
   limit: z.number()
     .int()
-    .min(1, 'Limit must be at least 1')
-    .max(100, 'Limit cannot exceed 100')
+    .min(1, '每页数量最小为 1')
+    .max(100, '每页数量不能超过 100')
     .default(20),
 
   // 搜索相关
   searchQuery: z.string()
-    .max(200, 'Search query too long')
+    .max(200, '搜索内容过长')
     .transform(val => sanitizeInput(val)),
 };
 

@@ -155,7 +155,7 @@ async function fillField(body: ThinkRequest) {
   
   switch (field) {
     case 'title':
-      systemPrompt = `你是一个专业的学术论文标题生成专家，擅长为服装、设计、时尚、人文社科与技术交叉领域的研究生成专业、准确的标题。
+      systemPrompt = `你是一个专业的学术论文标题生成专家，擅长为各种领域的研究生成专业、准确的标题。
 
 你的任务是：
 1. 基于用户提供的信息生成一个具体、专业的研究标题
@@ -178,10 +178,11 @@ async function fillField(body: ThinkRequest) {
       systemPrompt = `你是一个专业的学术研究专家，擅长识别和确定研究对象。
 
 你的任务是：
-1. 基于用户提供的信息，确定具体的研究对象
-2. 研究对象要具体、明确
-3. 符合学术规范
-4. 不要添加任何解释或说明
+1. 基于用户提供的研究标题，确定具体的研究对象
+2. 研究对象要与研究标题紧密相关，不要偏离主题
+3. 研究对象要具体、明确
+4. 符合学术规范
+5. 不要添加任何解释或说明
 
 输出格式：直接输出研究对象文本，不要有任何前缀或后缀。`;
       
@@ -198,8 +199,8 @@ async function fillField(body: ThinkRequest) {
       systemPrompt = `你是一个专业的学术关键词提取专家，擅长为研究生成准确的关键词。
 
 你的任务是：
-1. 基于用户提供的信息，提取3-5个核心关键词
-2. 关键词要能准确反映研究内容
+1. 基于用户提供的研究标题，提取3-5个核心关键词
+2. 关键词要能准确反映研究内容，与研究标题紧密相关
 3. 符合学术规范
 4. 用逗号分隔
 5. 不要添加任何解释或说明
@@ -219,10 +220,11 @@ async function fillField(body: ThinkRequest) {
       systemPrompt = `你是一个专业的学术研究描述专家，擅长将初步想法转化为专业的研究描述。
 
 你的任务是：
-1. 基于用户提供的信息，生成详细、专业的研究描述
+1. 基于用户提供的研究标题，生成详细、专业的研究描述
 2. 描述要包含研究背景、研究问题、研究目标等要素
-3. 符合学术规范
-4. 语言清晰、逻辑严谨
+3. 内容要与研究标题紧密相关，不要偏离主题
+4. 符合学术规范
+5. 语言清晰、逻辑严谨
 
 输出格式：直接输出研究描述文本，不要有任何前缀或后缀。`;
       
@@ -243,13 +245,16 @@ async function fillField(body: ThinkRequest) {
   }
 
   try {
+    console.log(`Generating ${field} for title: ${title}`);
     const aiResult = await orchestrateAIRequest({
       taskType: 'strategy',
       prompt,
       systemPrompt,
-      temperature: 0.7
+      temperature: 0.7,
+      enableFallback: false
     });
 
+    console.log(`AI result for ${field}:`, aiResult.content);
     return {
       ok: true,
       content: {
@@ -265,12 +270,14 @@ async function fillField(body: ThinkRequest) {
   } catch (error) {
     console.error(`AI field filling failed for ${field}:`, error);
     // 返回默认内容作为回退
+    const defaultContent = getDefaultFieldContent(field, title || "研究主题");
+    console.log(`Using default content for ${field}:`, defaultContent);
     return {
       ok: true,
       content: {
-        content: getDefaultFieldContent(field, title || "研究主题"),
+        content: defaultContent,
         sections: {
-          [field]: getDefaultFieldContent(field, title || "研究主题")
+          [field]: defaultContent
         },
         metadata: {
           generatedField: field,
@@ -283,15 +290,33 @@ async function fillField(body: ThinkRequest) {
 
 // 获取默认字段内容
 function getDefaultFieldContent(field: string, title: string): string {
+  // 提取标题中的核心词汇
+  const extractCoreWords = (text: string) => {
+    // 移除常见的前缀和后缀
+    let processed = text.replace(/基于|研究|理论|实践|探索|科学|技术/g, '');
+    // 按空格和标点分割
+    const words = processed.split(/[\s,，：:]+/).filter(word => word.length > 2);
+    return words;
+  };
+
+  const coreWords = extractCoreWords(title);
+  
   switch (field) {
     case 'title':
       return `基于${title}的跨学科研究：理论与实践探索`;
     case 'subject':
-      return `服装、设计、时尚与技术交叉领域`;
+      if (coreWords.length > 0) {
+        return `${coreWords.join('、')}相关领域`;
+      }
+      return `${title}相关领域`;
     case 'keywords':
-      return `跨学科研究, 设计创新, 技术应用, 时尚产业, 理论实践`;
+      // 从标题中提取关键词
+      const titleWords = title.split(/[\s,，]+/).filter(word => word.length > 2);
+      const defaultKeywords = ['跨学科研究', '理论与实践', '创新应用'];
+      const keywords = [...titleWords.slice(0, 2), ...defaultKeywords].slice(0, 5);
+      return keywords.join(', ');
     case 'description':
-      return `本研究旨在深入探讨${title}相关的跨学科问题，通过理论分析与实践探索相结合的方法，为该领域的发展提供新的视角和解决方案。研究将重点关注理论基础、实践应用、创新路径等方面，通过系统的文献综述、实证研究和案例分析，构建完整的研究框架，为相关领域的学术研究和实践应用提供参考。`;
+      return `本研究旨在深入探讨${title}相关的学术问题，通过理论分析与实践探索相结合的方法，为该领域的发展提供新的视角和解决方案。研究将重点关注理论基础、实践应用、创新路径等方面，通过系统的文献综述、实证研究和案例分析，构建完整的研究框架，为相关领域的学术研究和实践应用提供参考。`;
     default:
       return `该字段内容需要根据具体研究内容生成。`;
   }
