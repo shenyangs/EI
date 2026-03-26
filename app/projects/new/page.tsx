@@ -39,10 +39,11 @@ type AiAnalysisResult = {
 };
 
 export default function NewProjectPage() {
-  const [title, setTitle] = useState("非遗纹样驱动的智能服饰交互设计研究");
-  const [subject, setSubject] = useState("智能服饰原型、传统纹样元素、试穿用户");
-  const [keywords, setKeywords] = useState("非遗纹样, 智能服饰, 用户体验, 交互设计");
-  const [description, setDescription] = useState("我想研究传统纹样如何进入智能服饰场景，并通过小规模用户测试验证文化识别度和交互体验。");
+  const [title, setTitle] = useState("");
+  const [subject, setSubject] = useState("");
+  const [keywords, setKeywords] = useState("");
+  const [description, setDescription] = useState("");
+  const [aiFilling, setAiFilling] = useState<Record<string, boolean>>({});
   const [venueId, setVenueId] = useState("ieee-iccci-2026");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -106,6 +107,65 @@ export default function NewProjectPage() {
       setError(err instanceof Error ? err.message : "AI 分析失败");
     } finally {
       setIsAnalyzing(false);
+    }
+  }
+
+  async function fillWithAi(field: string, currentValue: string) {
+    setAiFilling(prev => ({ ...prev, [field]: true }));
+    setError("");
+
+    try {
+      const response = await fetch("/api/ai/think", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          taskType: "fill_field",
+          context: {
+            field,
+            currentValue,
+            userInputs: {
+              title,
+              subject,
+              keywords,
+              description,
+              venueId
+            }
+          }
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (!data.ok) {
+        throw new Error(data.error || "AI 填充失败");
+      }
+
+      const filledValue = data.content?.sections?.[field] || data.content?.content || "";
+      
+      switch (field) {
+        case "title":
+          setTitle(filledValue);
+          break;
+        case "subject":
+          setSubject(filledValue);
+          break;
+        case "keywords":
+          setKeywords(filledValue);
+          break;
+        case "description":
+          setDescription(filledValue);
+          break;
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "AI 填充失败");
+    } finally {
+      setAiFilling(prev => ({ ...prev, [field]: false }));
     }
   }
 
@@ -185,39 +245,79 @@ export default function NewProjectPage() {
         <form onSubmit={handleSubmit} className="form-grid">
           <label className="field">
             <span>论文主题</span>
-            <input 
-              value={title} 
-              onChange={(e) => setTitle(e.target.value)}
-              required
-            />
+            <div className="field-with-ai">
+              <input 
+                value={title} 
+                onChange={(e) => setTitle(e.target.value)}
+                required
+              />
+              <button 
+                type="button" 
+                className="ai-fill-button"
+                onClick={() => fillWithAi("title", title)}
+                disabled={aiFilling.title}
+              >
+                {aiFilling.title ? "AI 生成中..." : "AI 填写"}
+              </button>
+            </div>
             <small>这是研究核心问题，后面的题目类型和框架都会基于它判断。</small>
           </label>
 
           <label className="field">
             <span>研究对象</span>
-            <input 
-              value={subject} 
-              onChange={(e) => setSubject(e.target.value)}
-            />
+            <div className="field-with-ai">
+              <input 
+                value={subject} 
+                onChange={(e) => setSubject(e.target.value)}
+              />
+              <button 
+                type="button" 
+                className="ai-fill-button"
+                onClick={() => fillWithAi("subject", subject)}
+                disabled={aiFilling.subject}
+              >
+                {aiFilling.subject ? "AI 生成中..." : "AI 填写"}
+              </button>
+            </div>
             <small>比如服装产品、用户群体、文化元素、实验对象等。</small>
           </label>
 
           <label className="field field--full">
             <span>关键词</span>
-            <input 
-              value={keywords} 
-              onChange={(e) => setKeywords(e.target.value)}
-            />
+            <div className="field-with-ai">
+              <input 
+                value={keywords} 
+                onChange={(e) => setKeywords(e.target.value)}
+              />
+              <button 
+                type="button" 
+                className="ai-fill-button"
+                onClick={() => fillWithAi("keywords", keywords)}
+                disabled={aiFilling.keywords}
+              >
+                {aiFilling.keywords ? "AI 生成中..." : "AI 填写"}
+              </button>
+            </div>
             <small>先写你现在脑子里最确定的 3 到 5 个词，后面还能继续改。</small>
           </label>
 
           <label className="field field--full">
             <span>已有想法说明</span>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={6}
-            />
+            <div className="field-with-ai field-with-ai--textarea">
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={6}
+              />
+              <button 
+                type="button" 
+                className="ai-fill-button"
+                onClick={() => fillWithAi("description", description)}
+                disabled={aiFilling.description}
+              >
+                {aiFilling.description ? "AI 生成中..." : "AI 填写"}
+              </button>
+            </div>
             <small>这里写自然语言就行，不需要一开始就写成学术表达。</small>
           </label>
 

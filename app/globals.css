@@ -2397,6 +2397,65 @@ html {
   font-size: 0.84rem;
 }
 
+.field-with-ai {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.field-with-ai input {
+  flex: 1;
+  min-width: 0;
+}
+
+.field-with-ai--textarea {
+  align-items: flex-start;
+}
+
+.field-with-ai--textarea textarea {
+  flex: 1;
+  min-width: 0;
+  resize: vertical;
+}
+
+.ai-fill-button {
+  min-width: 80px;
+  min-height: 40px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface-muted);
+  color: var(--accent);
+  font-size: 0.84rem;
+  font-weight: 650;
+  cursor: pointer;
+  transition: all 200ms ease;
+  white-space: nowrap;
+}
+
+.ai-fill-button:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  transform: translateY(-1px);
+}
+
+.ai-fill-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+@media (max-width: 768px) {
+  .field-with-ai {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .ai-fill-button {
+    min-width: auto;
+  }
+}
+
 input,
 textarea {
   border: 1px solid var(--border);

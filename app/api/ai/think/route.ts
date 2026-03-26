@@ -5,7 +5,19 @@ import { orchestrateAIRequest } from "@/lib/ai/ai-orchestrator";
 type ThinkRequest = {
   taskType: AiTaskType;
   content?: string;
-  context: AiTaskContext;
+  context: AiTaskContext & {
+    userInputs?: {
+      title?: string;
+      subject?: string;
+      keywords?: string;
+      description?: string;
+      venueId?: string;
+      selectedDirection?: {
+        label?: string;
+        description?: string;
+      };
+    };
+  };
 };
 
 export async function POST(request: Request) {
@@ -39,67 +51,19 @@ export async function POST(request: Request) {
     // 根据任务类型选择处理方式
     switch (body.taskType) {
       case 'topic_analysis':
-        // 主题分析 - 使用项目标题作为内容
-        result = await orchestrateAIRequest({
-          taskType: 'direction',
-          prompt: `请为主题"${body.context.projectTitle}"生成5个具体的研究方向，每个方向包括名称、描述、研究价值和可行性分析。`,
-          systemPrompt: `你是一个面向服装、设计、时尚、人文社科与技术交叉研究的学术方向顾问。基于用户提供的主题，生成3-5个具体的研究方向，每个方向包括：
-1. 方向名称
-2. 简要描述（1-2句话）
-3. 研究价值
-4. 可行性分析
-
-输出必须结构清晰、学术表达克制，不要输出思考过程。`,
-          temperature: 0.7,
-          enableFallback: true
-        });
-        return NextResponse.json({
-          ok: true,
-          content: {
-            content: result.content,
-            metadata: {
-              directions: parseDirections(result.content)
-            }
-          }
-        });
+        // 主题分析 - 基于用户输入的详细信息生成研究方向
+        result = await generateTopicAnalysis(body);
+        return NextResponse.json(result);
         
       case 'outline_generation':
-        // 大纲生成
-        result = await orchestrateAIRequest({
-          taskType: 'strategy',
-          prompt: `请为项目"${body.context.projectTitle}"生成详细的论文大纲。`,
-          systemPrompt: `你是一个学术论文大纲生成专家。请生成结构清晰、逻辑严谨的论文大纲。`,
-          temperature: 0.7,
-          enableFallback: true
-        });
-        return NextResponse.json({
-          ok: true,
-          content: {
-            content: result.content,
-            metadata: {
-              topics: extractTopics(result.content)
-            }
-          }
-        });
+        // 大纲生成 - 基于选择的方向生成详细大纲
+        result = await generateOutline(body);
+        return NextResponse.json(result);
         
       case 'project_initialization':
-        // 项目初始化分析
-        result = await orchestrateAIRequest({
-          taskType: 'strategy',
-          prompt: `请分析项目"${body.context.projectTitle}"的可行性和研究方向。`,
-          systemPrompt: `你是一个项目分析专家。请分析项目的可行性、创新性和研究价值。`,
-          temperature: 0.7,
-          enableFallback: true
-        });
-        return NextResponse.json({
-          ok: true,
-          content: {
-            content: result.content,
-            metadata: {
-              analysis: result.content
-            }
-          }
-        });
+        // 项目初始化分析 - 全面分析用户输入
+        result = await generateProjectAnalysis(body);
+        return NextResponse.json(result);
         
       case 'content_generation':
       case 'quality_review':
@@ -114,8 +78,19 @@ export async function POST(request: Request) {
             { status: 400 }
           );
         }
-        result = await AiOrchestrator.runTask(body.taskType, body.content, body.context);
-        return NextResponse.json(result);
+        try {
+          result = await AiOrchestrator.runTask(body.taskType, body.content, body.context);
+          return NextResponse.json(result);
+        } catch (error) {
+          console.warn('AI runTask failed, using fallback:', error);
+          return NextResponse.json({
+            ok: true,
+            content: {
+              content: "AI 服务暂时不可用，请稍后重试。",
+              metadata: {}
+            }
+          });
+        }
         
       default:
         // 使用旧的 runTask 方法处理其他任务
@@ -128,10 +103,22 @@ export async function POST(request: Request) {
             { status: 400 }
           );
         }
-        result = await AiOrchestrator.runTask(body.taskType, body.content, body.context);
-        return NextResponse.json(result);
+        try {
+          result = await AiOrchestrator.runTask(body.taskType, body.content, body.context);
+          return NextResponse.json(result);
+        } catch (error) {
+          console.warn('AI runTask failed, using fallback:', error);
+          return NextResponse.json({
+            ok: true,
+            content: {
+              content: "AI 服务暂时不可用，请稍后重试。",
+              metadata: {}
+            }
+          });
+        }
     }
   } catch (error) {
+    console.error('Unexpected error in think route:', error);
     const message = error instanceof Error ? error.message : "AI 思考过程失败。";
 
     return NextResponse.json(
@@ -144,77 +131,133 @@ export async function POST(request: Request) {
   }
 }
 
-// 解析研究方向
-function parseDirections(content: string): any[] {
-  const directions = [];
-  const lines = content.split('\n');
-  let currentDirection: any = null;
+// 生成主题分析 - 基于用户输入的详细信息
+async function generateTopicAnalysis(body: ThinkRequest) {
+  const { projectTitle, userInputs } = body.context;
+  const { subject, keywords, description } = userInputs || {};
   
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    
-    // 匹配方向标题（如 "1. 方向名称" 或 "方向一：名称"）
-    if (/^\d+[.．、]/.test(trimmed) || /^方向[一二三四五]/.test(trimmed)) {
-      if (currentDirection) {
-        directions.push(currentDirection);
+  // 构建详细的prompt
+  let prompt = `请为以下研究主题生成5个具体、个性化的研究方向：
+
+【主题】${projectTitle}`;
+  
+  if (subject) {
+    prompt += `\n【学科领域】${subject}`;
+  }
+  
+  if (keywords) {
+    prompt += `\n【关键词】${keywords}`;
+  }
+  
+  if (description) {
+    prompt += `\n【研究描述】${description}`;
+  }
+  
+  prompt += `\n\n要求：
+1. 生成的研究方向必须紧密结合用户提供的主题、学科、关键词和描述
+2. 每个方向要具体、可操作，不能是泛泛而谈
+3. 体现学科交叉特色（服装、设计、时尚、人文社科与技术）
+4. 输出格式：
+   - 方向名称
+   - 核心问题（1-2句话）
+   - 研究价值
+   - 可行性分析
+   - 创新点
+   - 预期成果`;
+
+  try {
+    const aiResult = await orchestrateAIRequest({
+      taskType: 'direction',
+      prompt,
+      systemPrompt: `你是一个专业的学术研究顾问，擅长为服装、设计、时尚、人文社科与技术交叉领域提供个性化的研究方向建议。
+
+你的任务是：
+1. 深入理解用户提供的主题、学科、关键词和描述
+2. 生成5个具体、个性化、可操作的研究方向
+3. 每个方向必须紧密结合用户的输入，不能是模板化的内容
+4. 体现学科交叉特色
+5. 提供详细的研究价值、可行性分析、创新点和预期成果
+
+输出必须结构清晰、学术表达克制，不要输出思考过程。`,
+      temperature: 0.8,
+      enableFallback: true
+    });
+
+    return {
+      ok: true,
+      content: {
+        content: aiResult.content,
+        metadata: {
+          directions: parseDirections(aiResult.content)
+        }
       }
-      currentDirection = {
-        id: `direction-${directions.length + 1}`,
-        label: trimmed.replace(/^\d+[.．、]\s*/, '').replace(/^方向[一二三四五][：:]\s*/, ''),
-        description: '',
-        confidence: 90
-      };
-    } else if (currentDirection) {
-      currentDirection.description += trimmed + ' ';
-    }
-  }
-  
-  if (currentDirection) {
-    directions.push(currentDirection);
-  }
-  
-  // 如果没有解析出方向，返回默认方向
-  if (directions.length === 0) {
-    return [
-      {
-        id: 'direction-1',
-        label: '理论研究',
-        description: '基于理论分析的研究方向',
-        confidence: 85
-      },
-      {
-        id: 'direction-2',
-        label: '实证研究',
-        description: '基于数据实证的研究方向',
-        confidence: 80
+    };
+  } catch (error) {
+    console.error('AI topic analysis failed:', error);
+    // 返回默认方向
+    return {
+      ok: true,
+      content: {
+        content: generateDefaultDirections(projectTitle),
+        metadata: {
+          directions: getDefaultDirections(projectTitle)
+        }
       }
-    ];
+    };
   }
-  
-  return directions;
 }
 
-// 提取主题关键词
-function extractTopics(content: string): string[] {
-  const topics = [];
-  const lines = content.split('\n');
+// 生成大纲
+async function generateOutline(body: ThinkRequest) {
+  const { projectTitle, userInputs } = body.context;
+  const { selectedDirection } = userInputs || {};
   
-  for (const line of lines) {
-    const trimmed = line.trim();
-    // 提取可能的主题（带序号的行）
-    if (/^\d+[.．、]/.test(trimmed)) {
-      const topic = trimmed.replace(/^\d+[.．、]\s*/, '').split(/[：:]/)[0];
-      if (topic && topic.length > 2 && topic.length < 50) {
-        topics.push(topic);
+  let prompt = `请为以下研究项目生成详细的博士开题级别大纲：
+
+【主题】${projectTitle}`;
+  
+  if (selectedDirection?.label) {
+    prompt += `\n【选定方向】${selectedDirection.label}`;
+  }
+  
+  if (selectedDirection?.description) {
+    prompt += `\n【方向描述】${selectedDirection.description}`;
+  }
+  
+  prompt += `\n\n要求：
+1. 大纲必须紧密结合选定的研究方向
+2. 结构完整，包含：绪论、文献综述、研究方法、研究结果、讨论、结论
+3. 每个章节要有明确的目标和摘要
+4. 符合博士开题级别的学术规范
+5. 体现学科交叉特色`;
+
+  try {
+    const aiResult = await orchestrateAIRequest({
+      taskType: 'strategy',
+      prompt,
+      systemPrompt: `你是一个专业的学术论文大纲生成专家，擅长为博士开题级别的论文生成详细、规范的大纲。
+
+你的任务是：
+1. 基于用户提供的主题和选定方向，生成完整的论文大纲
+2. 每个章节必须包含：章节标题、目标、摘要
+3. 结构严谨，逻辑清晰
+4. 符合学术规范
+5. 体现学科交叉特色
+
+输出必须结构清晰、学术表达克制，不要输出思考过程。`,
+      temperature: 0.7,
+      enableFallback: true
+    });
+
+    return {
+      ok: true,
+      content: {
+        content: aiResult.content,
+        metadata: {
+          topics: extractTopics(aiResult.content)
+        }
       }
-    }
-  }
-  
-  // 如果没有提取到主题，返回默认主题
-  if (topics.length === 0) {
-    return ['研究背景', '研究方法', '研究结果', '讨论与分析', '结论与展望'];
-  }
-  
-  return topics.slice(0, 5);
-}
+    };
+  } catch (error) {
+    console.error('AI outline generation failed:', error);
+    // 返回
