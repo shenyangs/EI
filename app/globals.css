@@ -3489,6 +3489,7 @@ textarea:focus {
 /* 论文类型选择器样式 */
 .paper-type-dropdown {
   position: relative;
+  z-index: 1000;
 }
 
 .paper-type-dropdown__menu {
@@ -3503,6 +3504,20 @@ textarea:focus {
   box-shadow: var(--shadow);
   padding: var(--space-md);
   margin-top: 8px;
+  max-height: 400px;
+  overflow-y: auto;
+  display: block !important;
+}
+
+.choice-card {
+  cursor: pointer;
+  transition: all 200ms ease;
+}
+
+.choice-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-soft);
 }
 
 .paper-type__meta-text {
