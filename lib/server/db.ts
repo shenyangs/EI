@@ -82,12 +82,16 @@ class SqlExecutor {
     this.store = store;
   }
 
-  // 执行INSERT/UPDATE/DELETE语句
+  // 执行 INSERT/UPDATE/DELETE 语句
   async run(sql: string, params?: any[]): Promise<void> {
     console.log('Executing SQL:', sql, params);
 
     if (sql.includes('INSERT INTO projects')) {
       this.handleInsertProjects(params);
+    } else if (sql.includes('UPDATE projects')) {
+      this.handleUpdateProjects(params);
+    } else if (sql.includes('DELETE FROM projects')) {
+      this.handleDeleteProjects(params);
     } else if (sql.includes('INSERT INTO project_versions')) {
       this.handleInsertProjectVersions(params);
     } else if (sql.includes('INSERT INTO ai_models')) {
@@ -254,13 +258,38 @@ class SqlExecutor {
     }
   }
 
-  // 处理DELETE FROM ai_models
+  // 处理 DELETE FROM ai_models
   private handleDeleteAiModels(params?: any[]): void {
     const [id] = params || [];
     this.store.aiModels = this.store.aiModels.filter(m => m.id !== id);
   }
 
-  // 处理INSERT INTO users
+  // 处理 UPDATE projects
+  private handleUpdateProjects(params?: any[]): void {
+    // params 顺序：title, subject, keywords, description, updatedAt, venueId, id
+    const [title, subject, keywords, description, updatedAt, venueId, id] = params || [];
+    const index = this.store.projects.findIndex(p => p.id === id);
+    if (index !== -1) {
+      const project = this.store.projects[index];
+      this.store.projects[index] = {
+        ...project,
+        title: title !== undefined ? title : project.title,
+        subject: subject !== undefined ? subject : project.subject,
+        keywords: keywords !== undefined ? keywords : project.keywords,
+        description: description !== undefined ? description : project.description,
+        updatedAt,
+        venueId: venueId !== undefined ? venueId : project.venueId
+      };
+    }
+  }
+
+  // 处理 DELETE FROM projects
+  private handleDeleteProjects(params?: any[]): void {
+    const [id] = params || [];
+    this.store.projects = this.store.projects.filter(p => p.id !== id);
+  }
+
+  // 处理 INSERT INTO users
   private handleInsertUsers(params?: any[]): void {
     const [id, username, email, password, fullName, userType, institution, department, createdAt, updatedAt] = params || [];
     this.store.users.push({

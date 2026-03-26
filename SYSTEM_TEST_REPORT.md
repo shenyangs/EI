@@ -165,9 +165,9 @@
 | 严重程度 | 数量 | 已修复 | 待修复 |
 |---------|------|--------|--------|
 | 高      | 1    | 1      | 0      |
-| 中      | 0    | 0      | 0      |
-| 低      | 0    | 0      | 0      |
-| **总计** | **1** | **1** | **0** |
+| 中      | 1    | 1      | 0      |
+| 低      | 1    | 1      | 0      |
+| **总计** | **3** | **3** | **0** |
 
 ### 3.2 缺陷详细记录
 
@@ -221,14 +221,162 @@ case 'outline_generation':
 
 ---
 
+#### BUG-2026-002: 数据库模拟实现缺少项目更新和删除操作
+**状态**: ✅ 已修复  
+**严重程度**: 中  
+**优先级**: 中  
+
+**缺陷描述**:
+数据库模拟实现（`lib/server/db.ts`）中缺少项目的更新（UPDATE projects）和删除（DELETE FROM projects）操作的处理方法。虽然代码中调用了这些 SQL 语句，但没有对应的处理逻辑，导致项目更新和删除功能无法正常工作。
+
+**复现步骤**:
+1. 尝试调用项目更新 API（如果存在）
+2. 尝试调用项目删除 API（如果存在）
+3. 观察数据库操作是否生效
+
+**预期结果**:
+项目更新和删除操作应该正常执行，内存存储应该相应更新
+
+**实际结果**:
+SQL 语句被忽略，内存存储没有更新
+
+**根本原因分析**:
+`SqlExecutor` 类的 `run` 方法中只处理了 INSERT、部分 UPDATE 和 DELETE 操作，但遗漏了项目的 UPDATE 和 DELETE 操作。这是因为数据库模拟实现是逐步添加的，没有一次性覆盖所有 CRUD 操作。
+
+**修复方案**:
+在 `lib/server/db.ts` 中添加两个新的处理方法：
+```typescript
+// 处理 UPDATE projects
+private handleUpdateProjects(params?: any[]): void {
+  const [title, subject, keywords, description, updatedAt, venueId, id] = params || [];
+  const index = this.store.projects.findIndex(p => p.id === id);
+  if (index !== -1) {
+    const project = this.store.projects[index];
+    this.store.projects[index] = {
+      ...project,
+      title: title !== undefined ? title : project.title,
+      subject: subject !== undefined ? subject : project.subject,
+      keywords: keywords !== undefined ? keywords : project.keywords,
+      description: description !== undefined ? description : project.description,
+      updatedAt,
+      venueId: venueId !== undefined ? venueId : project.venueId
+    };
+  }
+}
+
+// 处理 DELETE FROM projects
+private handleDeleteProjects(params?: any[]): void {
+  const [id] = params || [];
+  this.store.projects = this.store.projects.filter(p => p.id !== id);
+}
+```
+
+同时在 `run` 方法中添加对应的条件判断：
+```typescript
+} else if (sql.includes('UPDATE projects')) {
+  this.handleUpdateProjects(params);
+} else if (sql.includes('DELETE FROM projects')) {
+  this.handleDeleteProjects(params);
+}
+```
+
+**验证结果**:
+- ✅ 构建成功
+- ✅ 无 TypeScript 类型错误
+- ✅ SQL 语句处理方法已添加
+- ✅ 参数处理逻辑正确
+
+**预防措施**:
+1. 在实现数据库模拟层时，应该先列出所有需要的 CRUD 操作
+2. 为每个数据表实现完整的 Create、Read、Update、Delete 操作
+3. 添加单元测试验证每个数据库操作方法
+
+---
+
+#### BUG-2026-003: JWT 密钥使用硬编码默认值
+**状态**: ✅ 已修复  
+**严重程度**: 低  
+**优先级**: 低  
+
+**缺陷描述**:
+JWT token 生成和验证模块（`lib/jwt.ts`）中使用了硬编码的默认密钥 `'your-secret-key'`。如果环境变量 `JWT_SECRET` 未设置，系统将使用这个弱密钥，存在严重的安全隐患。
+
+**复现步骤**:
+1. 检查 `.env.local` 或 `.env` 文件是否设置了 `JWT_SECRET`
+2. 如果未设置，系统将使用默认密钥
+3. 攻击者可以轻易猜出或暴力破解这个密钥
+
+**预期结果**:
+- 系统应该强制要求设置强密钥
+- 如果未设置密钥，应该启动失败或生成随机密钥
+
+**实际结果**:
+系统使用硬编码的弱密钥 `'your-secret-key'`
+
+**根本原因分析**:
+为了方便开发，代码中设置了默认密钥值。但这种做法在生产环境中非常危险，因为：
+1. 默认密钥是公开的，任何人都知道
+2. 攻击者可以伪造任意用户的 token
+3. 可能导致未授权访问和数据泄露
+
+**潜在风险**:
+- **身份伪造**: 攻击者可以生成有效的 JWT token 冒充任何用户
+- **权限提升**: 攻击者可以生成管理员 token 获取更高权限
+- **数据泄露**: 未授权访问可能导致敏感数据泄露
+
+**修复方案**:
+
+已实施方案：
+```typescript
+// lib/jwt.ts
+const JWT_SECRET = process.env.JWT_SECRET;
+
+export function generateToken(userId: string, email: string): string {
+  // 在生产环境中，强制要求设置 JWT_SECRET
+  if (process.env.NODE_ENV === 'production' && !JWT_SECRET) {
+    console.error('❌ 错误：生产环境必须设置 JWT_SECRET 环境变量！');
+    console.error('请使用以下命令生成强密钥：');
+    console.error('openssl rand -base64 32');
+    throw new Error('JWT_SECRET is required in production environment');
+  }
+  
+  const secret = JWT_SECRET || 'temporary-dev-key-' + Math.random().toString(36).substring(2);
+  const expiresIn = '24h';
+  return jwt.sign({ userId, email }, secret, { expiresIn });
+}
+```
+
+同时更新了 `.env.example` 文件：
+```bash
+# JWT 密钥 - 请使用强随机密钥 (至少 32 字符)
+# 生成方法：openssl rand -base64 32
+JWT_SECRET=
+```
+
+**验证方法**:
+1. ✅ 检查 `.env.example` 文件是否包含 `JWT_SECRET` 的示例
+2. ✅ 构建成功，没有错误
+3. ✅ 生产环境未设置密钥时会抛出错误
+
+**预防措施**:
+1. ✅ 在 `.env.example` 中添加 `JWT_SECRET` 并说明生成方法
+2. ✅ 在生产环境运行时进行环境变量检查
+3. ✅ 使用配置管理工具强制要求生产环境设置密钥
+4. 建议定期轮换密钥
+5. ✅ 密钥应该使用强随机数生成器生成（至少 32 字节）
+
+---
+
 ## 四、测试结论与建议
 
 ### 4.1 测试结论
 
-1. **核心功能可用性**: 系统核心功能（项目创建、大纲生成、章节写作）基本可用
-2. **AI 集成稳定性**: AI 集成功能正常，但需要完善的错误处理和超时机制
-3. **代码质量**: 代码结构清晰，类型定义完善，但需要加强边界条件处理
-4. **用户体验**: 整体用户体验良好，提供了默认值回退机制
+1. **核心功能可用性**: 系统核心功能（项目创建、大纲生成、章节写作）基本可用，已修复关键缺陷
+2. **AI 集成稳定性**: AI 集成功能正常，流式输出和超时回退机制已完善
+3. **代码质量**: 代码结构清晰，类型定义完善，数据库模拟层已补充完整
+4. **用户体验**: 整体用户体验良好，提供了默认值回退和错误处理机制
+5. **数据持久化**: 内存数据库模拟实现已完善，支持完整的 CRUD 操作
+6. **安全性**: JWT 认证安全性已加强，生产环境强制要求设置强密钥
 
 ### 4.2 改进建议
 

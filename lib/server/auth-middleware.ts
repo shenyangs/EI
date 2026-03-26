@@ -72,7 +72,9 @@ export async function authMiddleware(request: NextRequest) {
   const response = NextResponse.next();
   response.headers.set('X-User-Id', user.id);
   response.headers.set('X-User-Type', user.userType);
-  response.headers.set('X-Is-Super-Admin', user.isSuperAdmin ? 'true' : 'false');
+  if ('isSuperAdmin' in user) {
+    response.headers.set('X-Is-Super-Admin', user.isSuperAdmin ? 'true' : 'false');
+  }
   
   // 添加安全相关的响应头
   response.headers.set('X-Content-Type-Options', 'nosniff');
