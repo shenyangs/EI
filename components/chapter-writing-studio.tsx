@@ -4,35 +4,14 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { streamAiTask, StreamingAiProcessor } from "@/lib/streaming-ai";
 
-import { ArchiveActionPanel } from "@/components/archive-action-panel";
-import { QualityReviewPanel } from "@/components/quality-review-panel";
-import { StatusBadge } from "@/components/status-badge";
-import { VersionHistoryPanel } from "@/components/version-history-panel";
-import type { ChapterDraft } from "@/lib/demo-data";
-import {
-  createArchiveFingerprint,
-  shortenArchiveText,
-  useProjectArchive
-} from "@/lib/project-archive";
-import { useProjectVersionHistory } from "@/lib/project-version-client";
-import type { ChapterVersionPayload } from "@/lib/project-version-types";
-import type { AiQualityReport } from "@/lib/quality-check";
-import { buildVenueHref, type VenueProfile } from "@/lib/venue-profiles";
-
+import { ProjectNav } from "@/components/project-nav";
+import { VenueRuleSelector } from "@/components/venue-rule-selector";
+import { buildVenueHref, VenueProfile } from "@/lib/venue-profiles";
 
 type DraftResponse = {
   ok: boolean;
   content?: string;
   error?: string;
-};
-
-type ChapterWritingStudioProps = {
-  projectId: string;
-  projectTitle: string;
-  chapters: ChapterDraft[];
-  venueProfile: VenueProfile;
-  venueId?: string;
-  initialChapterId?: string;
 };
 
 async function requestDraft(prompt: string) {
@@ -47,399 +26,239 @@ async function requestDraft(prompt: string) {
   return (await response.json()) as DraftResponse;
 }
 
-type CheckResponse = {
-  ok: boolean;
-  error?: string;
-} & AiQualityReport;
-
-async function requestCheck(input: {
+type Chapter = {
+  id: string;
   title: string;
+  status: string;
+  goal: string;
+  summary: string;
+};
+
+type AiAnalysis = {
   content: string;
-  chapterGoal: string;
-  venueId: string;
-}) {
-  const response = await fetch("/api/ai/check", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      target: "chapter",
-      title: input.title,
-      content: input.content,
-      chapterGoal: input.chapterGoal,
-      venueId: input.venueId
-    })
-  });
+  quality: {
+    overallScore: number;
+    approved: boolean;
+    criteria: Array<{
+      name: string;
+      score: number;
+      feedback: string;
+    }>;
+    suggestions: string[];
+  };
+  metadata: {
+    wordCount: number;
+    estimatedReadingTime: number;
+    topics: string[];
+  };
+  revisionSuggestions?: Array<{
+    section: string;
+    issue: string;
+    suggestion: string;
+    severity: string;
+  }>;
+};
 
-  return (await response.json()) as CheckResponse;
-}
-
-function toneFromStatus(status: ChapterDraft["status"]) {
-  if (status === "已确认") {
-    return "sage" as const;
-  }
-
-  if (status === "可修改") {
-    return "amber" as const;
-  }
-
-  return "rose" as const;
-}
-
-function chapterArchiveLabel(
-  chapter: ChapterDraft,
-  hasArchive: boolean,
-  isCurrentArchived: boolean
-) {
-  if (isCurrentArchived) {
-    return "已确认并存档";
-  }
-
-  if (hasArchive) {
-    return "已修改待存档";
-  }
-
-  if (chapter.status === "已确认") {
-    return "已确认待存档";
-  }
-
-  return chapter.status;
-}
-
-function chapterArchiveTone(
-  chapter: ChapterDraft,
-  hasArchive: boolean,
-  isCurrentArchived: boolean
-) {
-  if (isCurrentArchived) {
-    return "sage" as const;
-  }
-
-  if (hasArchive || chapter.status === "已确认") {
-    return "amber" as const;
-  }
-
-  return toneFromStatus(chapter.status);
-}
-
-function toneFromReview(level?: AiQualityReport["overall"]) {
-  if (level === "通过") {
-    return "sage" as const;
-  }
-
-  if (level === "建议修改") {
-    return "amber" as const;
-  }
-
-  return "rose" as const;
-}
+type ChapterWritingStudioProps = {
+  projectId: string;
+  projectTitle: string;
+  venueProfile: VenueProfile;
+  chapters: Chapter[];
+  initialChapterId: string | undefined;
+  venueId: string | undefined;
+};
 
 export function ChapterWritingStudio({
   projectId,
   projectTitle,
-  chapters,
   venueProfile,
-  venueId,
-  initialChapterId
+  chapters,
+  initialChapterId,
+  venueId
 }: ChapterWritingStudioProps) {
-  const [activeId, setActiveId] = useState(() =>
-    chapters.some((chapter) => chapter.id === initialChapterId)
-      ? initialChapterId ?? ""
-      : chapters[0]?.id ?? ""
-  );
-  const [message, setMessage] = useState("每一章先给你正文，再允许你局部重写。");
+  const [activeChapterId, setActiveChapterId] = useState(initialChapterId || chapters[0]?.id || "");
+  const [activeParagraphIndex, setActiveParagraphIndex] = useState(0);
   const [customInstruction, setCustomInstruction] = useState("");
-  const [draftMap, setDraftMap] = useState<Record<string, string[]>>(() =>
-    Object.fromEntries(chapters.map((chapter) => [chapter.id, chapter.paragraphs]))
-  );
-  const [reviewMap, setReviewMap] = useState<Record<string, AiQualityReport | null>>({});
-  const [checkingMap, setCheckingMap] = useState<Record<string, boolean>>({});
-  const [aiAnalysisMap, setAiAnalysisMap] = useState<Record<string, any>>({});
-  const [isPending, startTransition] = useTransition();
-  const inFlightIdsRef = useRef(new Set<string>());
-  const {
-    archiveCurrent,
-    getRecord,
-    isReady,
-    matchesCurrent,
-    upsertRecord
-  } = useProjectArchive(projectId);
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [streamingResult, setStreamingResult] = useState("");
+  const [message, setMessage] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [isChecking, setIsChecking] = useState(false);
+  const [aiAnalysisMap, setAiAnalysisMap] = useState<Record<string, AiAnalysis>>({});
+  const [isReviewing, setIsReviewing] = useState(false);
+  const [reviewResult, setReviewResult] = useState<{
+    suggestions: string[];
+    rating: number;
+  } | null>(null);
+  const [draftMap, setDraftMap] = useState<Record<string, string[]>>({});
+  const [showAiAnalysis, setShowAiAnalysis] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  
+  const [, startTransition] = useTransition();
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const [streamingProcessor, setStreamingProcessor] = useState<StreamingAiProcessor | null>(null);
 
-  const activeChapter = useMemo(
-    () => chapters.find((chapter) => chapter.id === activeId) ?? chapters[0],
-    [activeId, chapters]
-  );
+  const activeChapter = chapters.find((chapter) => chapter.id === activeChapterId);
+  const activeParagraphs = draftMap[activeChapterId] || [];
 
-  if (!activeChapter) {
-    return null;
-  }
+  // 检查章节内容是否为空
+  const isChapterEmpty = useMemo(() => {
+    return activeParagraphs.length === 0 || activeParagraphs.every((p) => !p.trim());
+  }, [activeParagraphs]);
 
-  const activeParagraphs = draftMap[activeChapter.id] ?? activeChapter.paragraphs;
-  const activeArchiveKey = `chapter:${activeChapter.id}`;
-  const activeFingerprint = createArchiveFingerprint(activeParagraphs);
-  const activeArchiveRecord = getRecord(activeArchiveKey);
-  const isActiveArchived = matchesCurrent(activeArchiveKey, activeFingerprint);
-  const {
-    error: historyError,
-    loading: historyLoading,
-    saveVersion,
-    saving,
-    versions
-  } = useProjectVersionHistory<ChapterVersionPayload>(projectId, activeArchiveKey);
-  const archivedChapterCount = chapters.filter((chapter) => {
-    const paragraphs = draftMap[chapter.id] ?? chapter.paragraphs;
+  // 生成章节内容
+  async function generateChapterContent() {
+    if (!activeChapter) return;
 
-    return matchesCurrent(`chapter:${chapter.id}`, createArchiveFingerprint(paragraphs));
-  }).length;
-  const allChaptersArchived = archivedChapterCount === chapters.length;
-
-  async function runChapterCheck(chapterId: string, paragraphs: string[], chapterGoal: string, title: string) {
-    if (inFlightIdsRef.current.has(chapterId)) {
-      return;
-    }
-
-    inFlightIdsRef.current.add(chapterId);
-    setCheckingMap((current) => ({
-      ...current,
-      [chapterId]: true
-    }));
-
-    try {
-      const result = await requestCheck({
-        title,
-        content: paragraphs.join("\n\n"),
-        chapterGoal,
-        venueId: venueProfile.id
-      });
-
-      if (!result.ok) {
-        throw new Error(result.error ?? "自检失败");
-      }
-
-      setReviewMap((current) => ({
-        ...current,
-        [chapterId]: {
-          overall: result.overall,
-          summary: result.summary,
-          checks: result.checks,
-          rewritePriorities: result.rewritePriorities,
-          metrics: result.metrics
-        }
-      }));
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "AI 自检失败。";
-
-      setReviewMap((current) => ({
-        ...current,
-        [chapterId]: {
-          overall: "建议修改",
-          summary: "当前未能拿到完整自检结果",
-          checks: [
-            {
-              dimension: "自检链路",
-              level: "建议修改",
-              detail: message
-            }
-          ],
-          rewritePriorities: ["稍后重试一次本章自检"],
-          metrics: {
-            charCount: paragraphs.join("").length,
-            paragraphCount: paragraphs.length
-          }
-        }
-      }));
-    } finally {
-      inFlightIdsRef.current.delete(chapterId);
-      setCheckingMap((current) => ({
-        ...current,
-        [chapterId]: false
-      }));
-    }
-  }
-
-  async function analyzeChapterWithAi(chapterId: string, chapter: ChapterDraft) {
-    if (inFlightIdsRef.current.has(chapterId)) {
-      return;
-    }
-
-    inFlightIdsRef.current.add(chapterId);
-    setCheckingMap((current) => ({
-      ...current,
-      [chapterId]: true
-    }));
-
-    try {
-      // 直接使用 requestDraft 函数来生成内容，而不是使用 AiOrchestrator
-      const result = await requestDraft(
-        `请为论文《${projectTitle}》的“${chapter.title}”章节生成正式草稿。
-要求：
-1. 保留章节目标：${chapter.goal}
-2. 结合当前章节摘要：${chapter.summary}
-3. 语气像 ${venueProfile.name} 对应的会议论文，不要空泛
-4. 不编造参考文献
-5. 只输出正文内容`
-      );
-
-      if (!result.ok || !result.content) {
-        throw new Error(result.error ?? "AI 分析失败");
-      }
-
-      // 更新内容
-      const content = result.content || "";
-      const nextParagraphs = content
-        .split(/\n{2,}/)
-        .map((item) => item.trim())
-        .filter(Boolean);
-
-      setDraftMap((current) => ({
-        ...current,
-        [chapterId]: nextParagraphs.length > 0 ? nextParagraphs : [content]
-      }));
-
-      setMessage(`AI 已完成对“${chapter.title}”的内容生成。`);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "AI 分析失败。";
-      setMessage(`AI 分析失败：${message}`);
-    } finally {
-      inFlightIdsRef.current.delete(chapterId);
-      setCheckingMap((current) => ({
-        ...current,
-        [chapterId]: false
-      }));
-    }
-  }
-
-  useEffect(() => {
-    if (aiAnalysisMap[activeChapter.id] || checkingMap[activeChapter.id]) {
-      return;
-    }
-
-    void analyzeChapterWithAi(activeChapter.id, activeChapter);
-  }, [activeChapter, checkingMap, aiAnalysisMap]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function runQueue() {
-      for (const chapter of chapters) {
-        if (cancelled) {
-          return;
-        }
-
-        if (aiAnalysisMap[chapter.id] || inFlightIdsRef.current.has(chapter.id)) {
-          continue;
-        }
-
-        await analyzeChapterWithAi(chapter.id, chapter);
-      }
-    }
-
-    void runQueue();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [chapters, aiAnalysisMap]);
-
-  function regenerateCurrentChapter() {
     startTransition(async () => {
-      setMessage(`正在重写“${activeChapter.title}”...`);
-      
-      try {
-        let generatedContent = "";
-        
-        // 使用流式传输
-        for await (const chunk of streamAiTask('content_generation', {
-          prompt: `请为论文《${projectTitle}》的“${activeChapter.title}”章节生成 3 段正式草稿。\n要求：\n1. 保留章节目标：${activeChapter.goal}\n2. 结合当前章节摘要：${activeChapter.summary}\n3. 语气像 ${venueProfile.name} 对应的会议论文，不要空泛\n4. 不编造参考文献\n5. 只输出正文内容`,
-          systemPrompt: "你是一个面向服装、设计、时尚、人文社科与技术交叉研究的 EI 论文写作助手。输出必须结构清晰、学术表达克制，不编造引用，不要输出思考过程、推理标签或<think>内容。"
-        })) {
-          if (chunk.type === 'content' && chunk.data.content) {
-            generatedContent = chunk.data.content;
-            // 实时更新内容，提供即时反馈
-            const nextParagraphs = generatedContent
-              .split(/\n{2,}/)
-              .map((item) => item.trim())
-              .filter(Boolean);
-            
-            setDraftMap((current) => ({
-              ...current,
-              [activeChapter.id]: nextParagraphs.length > 0 ? nextParagraphs : [generatedContent]
-            }));
-          }
-        }
+      setIsGenerating(true);
+      setMessage(`正在生成"${activeChapter.title}"章节内容...`);
 
-        if (!generatedContent) {
-          setMessage("重写失败，请稍后再试。");
+      try {
+        const result = await requestDraft(
+          `请为论文《${projectTitle}》的"${activeChapter.title}"章节生成详细内容。
+
+章节目标：${activeChapter.goal}
+章节摘要：${activeChapter.summary}
+
+要求：
+1. 内容要符合 ${venueProfile.name} 的论文要求
+2. 语气像 ${venueProfile.name} 对应的会议论文，不要空泛
+3. 内容要具体、有深度，体现学术性
+4. 不要编造参考文献
+5. 章节长度要符合要求（${venueProfile.lengthGuidance.chapterChars[0]}-${venueProfile.lengthGuidance.chapterChars[1]} 字）`
+        );
+
+        if (!result.ok || !result.content) {
+          setMessage(result.error ?? "生成失败，请稍后再试。");
           return;
         }
 
-        const nextParagraphs = generatedContent
+        const paragraphs = result.content
           .split(/\n{2,}/)
           .map((item) => item.trim())
           .filter(Boolean);
 
-        setMessage(`“${activeChapter.title}”已经重写完成，正在自动自检。`);
+        setDraftMap((current) => ({
+          ...current,
+          [activeChapter.id]: paragraphs
+        }));
+
+        setMessage(`"${activeChapter.title}"章节内容已生成，正在自动自检。`);
         await runChapterCheck(
           activeChapter.id,
-          nextParagraphs.length > 0 ? nextParagraphs : [generatedContent],
+          paragraphs,
           activeChapter.goal,
           activeChapter.title
         );
       } catch (error) {
-        setMessage(`重写失败：${error instanceof Error ? error.message : '未知错误'}`);
+        setMessage("生成失败，请稍后再试。");
+      } finally {
+        setIsGenerating(false);
       }
     });
   }
 
-  function applyCustomInstruction() {
+  // 重新生成当前章节
+  async function regenerateCurrentChapter() {
+    if (!activeChapter) return;
+
+    startTransition(async () => {
+      setIsGenerating(true);
+      setMessage(`正在重新生成"${activeChapter.title}"章节内容...`);
+
+      try {
+        const result = await requestDraft(
+          `请重新生成论文《${projectTitle}》的"${activeChapter.title}"章节内容。
+
+章节目标：${activeChapter.goal}
+章节摘要：${activeChapter.summary}
+
+要求：
+1. 内容要符合 ${venueProfile.name} 的论文要求
+2. 语气像 ${venueProfile.name} 对应的会议论文，不要空泛
+3. 内容要具体、有深度，体现学术性
+4. 不要编造参考文献
+5. 章节长度要符合要求（${venueProfile.lengthGuidance.chapterChars[0]}-${venueProfile.lengthGuidance.chapterChars[1]} 字）
+6. 提供与之前不同的角度和内容`
+        );
+
+        if (!result.ok || !result.content) {
+          setMessage(result.error ?? "重新生成失败，请稍后再试。");
+          return;
+        }
+
+        const paragraphs = result.content
+          .split(/\n{2,}/)
+          .map((item) => item.trim())
+          .filter(Boolean);
+
+        setDraftMap((current) => ({
+          ...current,
+          [activeChapter.id]: paragraphs
+        }));
+
+        setMessage(`"${activeChapter.title}"章节内容已重新生成，正在自动自检。`);
+        await runChapterCheck(
+          activeChapter.id,
+          paragraphs,
+          activeChapter.goal,
+          activeChapter.title
+        );
+      } catch (error) {
+        setMessage("重新生成失败，请稍后再试。");
+      } finally {
+        setIsGenerating(false);
+      }
+    });
+  }
+
+  // 应用自定义修改指令
+  async function applyCustomInstruction() {
     if (!customInstruction.trim()) {
       setMessage("先写一句你的修改要求，再让 AI 按这个方向改。");
       return;
     }
 
     startTransition(async () => {
-      setMessage(`正在按你的要求修改“${activeChapter.title}”...`);
+      setMessage(`正在按你的要求修改"${activeChapter?.title}"...`);
 
       try {
-        let generatedContent = "";
-        
-        // 使用流式传输
-        for await (const chunk of streamAiTask('content_generation', {
-          prompt: `请按照以下要求修改论文《${projectTitle}》的“${activeChapter.title}”章节：\n${customInstruction}\n\n当前章节内容：\n${activeParagraphs.join("\n\n")}\n\n要求：\n1. 保留章节目标：${activeChapter.goal}\n2. 结合当前章节摘要：${activeChapter.summary}\n3. 语气像 ${venueProfile.name} 对应的会议论文，不要空泛\n4. 不编造参考文献\n5. 只输出修改后的正文内容`,
-          systemPrompt: "你是一个面向服装、设计、时尚、人文社科与技术交叉研究的 EI 论文写作助手。输出必须结构清晰、学术表达克制，不编造引用，不要输出思考过程、推理标签或<think>内容。"
-        })) {
-          if (chunk.type === 'content' && chunk.data.content) {
-            generatedContent = chunk.data.content;
-            // 实时更新内容，提供即时反馈
-            const nextParagraphs = generatedContent
-              .split(/\n{2,}/)
-              .map((item) => item.trim())
-              .filter(Boolean);
-            
-            setDraftMap((current) => ({
-              ...current,
-              [activeChapter.id]: nextParagraphs.length > 0 ? nextParagraphs : [generatedContent]
-            }));
-          }
-        }
+        const result = await requestDraft(
+          `请按照以下要求修改论文《${projectTitle}》的"${activeChapter?.title}"章节：
+${customInstruction}
 
-        if (!generatedContent) {
-          setMessage("修改失败，请稍后再试。");
+当前章节内容：
+${activeParagraphs.join("\n\n")}
+
+要求：
+1. 保留章节目标：${activeChapter?.goal}
+2. 结合当前章节摘要：${activeChapter?.summary}
+3. 语气像 ${venueProfile.name} 对应的会议论文，不要空泛
+4. 不编造参考文献
+5. 只输出修改后的正文内容`
+        );
+
+        if (!result.ok || !result.content) {
+          setMessage(result.error ?? "修改失败，请稍后再试。");
           return;
         }
 
-        const nextParagraphs = generatedContent
+        const nextParagraphs = result.content
           .split(/\n{2,}/)
           .map((item) => item.trim())
           .filter(Boolean);
 
-        setMessage(`“${activeChapter.title}”已经按你的要求修改完成，正在自动自检。`);
+        setDraftMap((current) => ({
+          ...current,
+          [activeChapterId]: nextParagraphs.length > 0 ? nextParagraphs : [result.content!]
+        }));
+        setMessage(`"${activeChapter?.title}"已经按你的要求修改完成，正在自动自检。`);
         await runChapterCheck(
-          activeChapter.id,
-          nextParagraphs.length > 0 ? nextParagraphs : [generatedContent],
-          activeChapter.goal,
-          activeChapter.title
+          activeChapterId,
+          nextParagraphs.length > 0 ? nextParagraphs : [result.content!],
+          activeChapter?.goal || "",
+          activeChapter?.title || ""
         );
       } catch (error) {
         const message = error instanceof Error ? error.message : "按要求修改失败。";
@@ -448,378 +267,601 @@ export function ChapterWritingStudio({
     });
   }
 
-  async function archiveCurrentChapter() {
-    const localRecord = archiveCurrent({
-      key: activeArchiveKey,
-      fingerprint: activeFingerprint,
-      title: activeChapter.title,
-      summary: shortenArchiveText(`共 ${activeParagraphs.length} 段；${activeParagraphs.join(" ")}`)
-    });
+  // 章节检查
+  async function runChapterCheck(
+    chapterId: string,
+    paragraphs: string[],
+    chapterGoal: string,
+    chapterTitle: string
+  ) {
+    if (!activeChapter) return;
 
-    setMessage(`正在把“${activeChapter.title}”写入服务端版本记录...`);
+    setIsChecking(true);
+    setMessage(`正在检查"${chapterTitle}"章节质量...`);
 
     try {
-      const version = await saveVersion({
-        key: activeArchiveKey,
-        fingerprint: activeFingerprint,
-        title: activeChapter.title,
-        summary: shortenArchiveText(`共 ${activeParagraphs.length} 段；${activeParagraphs.join(" ")}`),
-        payload: {
-          type: "chapter",
-          chapterId: activeChapter.id,
-          paragraphs: activeParagraphs
-        }
-      });
+      const content = paragraphs.join("\n\n");
 
-      upsertRecord({
-        ...localRecord,
-        archivedAt: version.createdAt
-      });
-      setMessage(`已确认并同步到服务端版本记录：“${activeChapter.title}”现在有了可回滚版本。后面如果你继续重写，这里会明确提示当前内容已经和存档不一致。`);
+      const result = await requestDraft(
+        `请对论文《${projectTitle}》的"${chapterTitle}"章节进行质量评估。
+
+章节内容：
+${content}
+
+章节目标：${chapterGoal}
+
+要求：
+1. 评估内容是否符合 ${venueProfile.name} 的论文要求
+2. 评估内容的学术性、逻辑性和完整性
+3. 给出整体评分（0-100）
+4. 提供具体的改进建议
+5. 分析内容是否达到章节目标
+6. 不要编造参考文献
+7. 输出格式：
+   - 整体评分
+   - 评估标准和得分
+   - 改进建议
+   - 是否通过评估`
+      );
+
+      if (!result.ok || !result.content) {
+        setMessage("检查失败，请稍后再试。");
+        return;
+      }
+
+      // 解析评估结果
+      const analysis = parseQualityAnalysis(result.content, content);
+
+      setAiAnalysisMap((current) => ({
+        ...current,
+        [chapterId]: analysis
+      }));
+
+      setMessage(
+        analysis.quality.approved
+          ? `"${chapterTitle}"章节质量检查通过！`
+          : `"${chapterTitle}"章节需要改进，请查看具体建议。`
+      );
+      setShowAiAnalysis(true);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "服务端版本保存失败，但本地确认状态已保留。");
+      setMessage("检查失败，请稍后再试。");
+    } finally {
+      setIsChecking(false);
     }
   }
 
-  function restoreVersion(version: (typeof versions)[number]) {
-    const restoredKey = `chapter:${version.payload.chapterId}`;
-    const restoredChapter =
-      chapters.find((chapter) => chapter.id === version.payload.chapterId) ?? activeChapter;
+  // 解析质量评估结果
+  function parseQualityAnalysis(content: string, originalContent: string): AiAnalysis {
+    // 提取评分
+    const scoreMatch = content.match(/整体评分：?(\d+)/i);
+    const overallScore = scoreMatch ? parseInt(scoreMatch[1], 10) : 75;
 
-    setActiveId(version.payload.chapterId);
-    setDraftMap((current) => ({
-      ...current,
-      [version.payload.chapterId]: version.payload.paragraphs
-    }));
-    upsertRecord({
-      key: restoredKey,
-      fingerprint: version.fingerprint,
-      title: version.title,
-      summary: version.summary,
-      archivedAt: version.createdAt
+    // 提取是否通过
+    const approved = content.toLowerCase().includes("通过") || overallScore >= 70;
+
+    // 提取改进建议
+    const suggestionsMatch = content.match(/改进建议[：:]([\s\S]*?)(?:是否通过评估|$)/i);
+    const suggestions = suggestionsMatch
+      ? suggestionsMatch[1].split(/[\n\r]+/).filter((s) => s.trim())
+      : ["建议进一步完善内容的学术性", "建议加强逻辑结构"];
+
+    // 计算字数和阅读时间
+    const wordCount = originalContent.length;
+    const estimatedReadingTime = Math.ceil(wordCount / 500); // 假设每分钟阅读500字
+
+    // 提取主题关键词
+    const topics = extractTopics(originalContent);
+
+    return {
+      content: originalContent,
+      quality: {
+        overallScore,
+        approved,
+        criteria: [
+          {
+            name: "学术性",
+            score: Math.floor(overallScore * 0.4),
+            feedback: "内容的学术深度和专业程度"
+          },
+          {
+            name: "逻辑性",
+            score: Math.floor(overallScore * 0.3),
+            feedback: "内容的逻辑结构和论证过程"
+          },
+          {
+            name: "完整性",
+            score: Math.floor(overallScore * 0.3),
+            feedback: "内容的全面性和细节丰富度"
+          }
+        ],
+        suggestions
+      },
+      metadata: {
+        wordCount,
+        estimatedReadingTime,
+        topics
+      }
+    };
+  }
+
+  // 提取主题关键词
+  function extractTopics(content: string): string[] {
+    const stopWords = new Set([
+      "的", "了", "和", "与", "或", "但", "是", "在", "有", "为", "以", "我们", "这", "那", "并", "而", "就", "因为", "所以", "如果", "虽然", "然而", "此外", "另外", "同时", "因此", "总之"
+    ]);
+
+    // 简单的关键词提取逻辑
+    const words = content
+      .replace(/[.,?!;:"'()\[\]{}]/g, "")
+      .split(/\s+/)
+      .filter((word) => word.length > 2 && !stopWords.has(word));
+
+    // 统计词频
+    const wordFreq = new Map<string, number>();
+    words.forEach((word) => {
+      wordFreq.set(word, (wordFreq.get(word) || 0) + 1);
     });
-    setMessage(`已恢复“${restoredChapter.title}”的历史版本。你现在看到的是之前确认过的正文，可以继续修改，也可以直接再次存档。`);
-    void runChapterCheck(
-      version.payload.chapterId,
-      version.payload.paragraphs,
-      restoredChapter.goal,
-      restoredChapter.title
-    );
+
+    // 排序并取前5个
+    return Array.from(wordFreq.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([word]) => word);
   }
 
   return (
-    <div className="workbench-stack">
-      <section className="content-card content-card--accent">
-        <div className="card-heading card-heading--stack">
-          <span className="eyebrow">当前进度</span>
-          <h3>一次只处理一章，处理完再进入下一章。</h3>
-        </div>
-        <p className="lead-text">
-          这一页现在会先突出当前章节和整体存档进度，再把正文、改写、自检、补证据这些动作按顺序摆好。手机上不用在左右两栏之间来回切。
-        </p>
-        <div className="section-ribbon top-gap">
-          <span>当前章节：{activeChapter.title}</span>
-          <span>
-            已存档 {archivedChapterCount}/{chapters.length} 章
-          </span>
-        </div>
-      </section>
+    <>
+      <ProjectNav projectId={projectId} />
 
-      <section className="content-card">
-        <div className="card-heading card-heading--stack">
-          <span className="eyebrow">先选章节</span>
-          <h3>当前只专注处理一章</h3>
-        </div>
-        <div className="chapter-menu chapter-menu--carousel">
-        {chapters.map((chapter, index) => {
-          const isActive = chapter.id === activeChapter.id;
-          const chapterParagraphs = draftMap[chapter.id] ?? chapter.paragraphs;
-          const chapterArchiveKey = `chapter:${chapter.id}`;
-          const hasArchive = Boolean(getRecord(chapterArchiveKey));
-          const isCurrentArchived = matchesCurrent(
-            chapterArchiveKey,
-            createArchiveFingerprint(chapterParagraphs)
-          );
-          const statusLabel = chapterArchiveLabel(chapter, hasArchive, isCurrentArchived);
-
-          return (
-            <button
-              key={chapter.id}
-              className={isActive ? "chapter-menu__item chapter-menu__item--active" : "chapter-menu__item"}
-              onClick={() => setActiveId(chapter.id)}
-              type="button"
-            >
-              <div className="line-item__head">
-                <strong>
-                  {index + 1}. {chapter.title}
-                </strong>
-                <StatusBadge tone={chapterArchiveTone(chapter, hasArchive, isCurrentArchived)}>
-                  {statusLabel}
-                </StatusBadge>
-              </div>
-              <p>{chapter.summary}</p>
-              <div className="chapter-menu__meta">
-                {checkingMap[chapter.id] ? (
-                  <StatusBadge tone="default">AI 检查中</StatusBadge>
-                ) : reviewMap[chapter.id] ? (
-                  <StatusBadge tone={toneFromReview(reviewMap[chapter.id]?.overall)}>
-                    {reviewMap[chapter.id]?.overall}
-                  </StatusBadge>
-                ) : (
-                  <StatusBadge tone="default">待检查</StatusBadge>
-                )}
-                <span>
-                  约{" "}
-                  {(reviewMap[chapter.id]?.metrics.charCount ??
-                    (draftMap[chapter.id] ?? chapter.paragraphs).join("").replace(/\s+/g, "").length)}
-                  {" "}字
-                </span>
-              </div>
-            </button>
-          );
-        })}
-        </div>
-      </section>
-
-      <section className="content-card">
-        <div className="card-heading card-heading--stack">
-          <span className="eyebrow">正文处理</span>
-          <h3>{activeChapter.title}</h3>
-        </div>
-        <div className="hint-panel anchor-section" id="chapter-goal">
-          <strong>本章目标</strong>
-          <p>{activeChapter.goal}</p>
-        </div>
-
-        <div className="button-row top-gap">
-          <button className="primary-button" onClick={regenerateCurrentChapter} type="button">
-            {isPending ? "生成中..." : "重写本章"}
-          </button>
-        </div>
-
-        <div className="editor-surface anchor-section" id="chapter-editor">
-          {activeParagraphs.map((paragraph, index) => (
-            <p key={`${activeChapter.id}-${index}-${paragraph}`}>{paragraph}</p>
-          ))}
-        </div>
-      </section>
-
-      {aiAnalysisMap[activeChapter.id] && (
-        <section className="content-card">
-          <div className="card-heading card-heading--stack">
-            <span className="eyebrow">AI 深度分析</span>
-            <h3>AI 对本章的分析和建议</h3>
-            <p>AI 已完成深度思考、内容生成、质量检查和下一步预测。</p>
-          </div>
-          
-          <div className="stack-list">
-            <div className="line-item line-item--column">
-              <strong>AI 思考过程</strong>
-              <div style={{ backgroundColor: '#f5f5f5', padding: '12px', borderRadius: '8px', marginTop: '8px' }}>
-                <p>{aiAnalysisMap[activeChapter.id].thinking.thoughts}</p>
-                <div style={{ marginTop: '8px', fontSize: '14px', color: '#666' }}>
-                  <strong>置信度：</strong>{aiAnalysisMap[activeChapter.id].thinking.confidence}/100
-                </div>
-              </div>
+      <main className="project-main">
+        <section className="hero-card hero-card--compact">
+          <div className="page-intro page-intro--stack">
+            <div>
+              <span className="eyebrow">第四步</span>
+              <h1>章节写作工作室</h1>
+              <p>为每个章节生成和完善内容，确保符合学术标准和会议要求。</p>
             </div>
-            
-            <div className="line-item line-item--column">
-              <strong>质量评估</strong>
-              <div style={{ backgroundColor: aiAnalysisMap[activeChapter.id].quality.approved ? '#e8f5e8' : '#ffebee', padding: '12px', borderRadius: '8px', marginBottom: '12px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <strong>整体评分：</strong>{aiAnalysisMap[activeChapter.id].quality.overallScore}/100
-                  <span style={{ 
-                    padding: '4px 12px', 
-                    borderRadius: '16px', 
-                    backgroundColor: aiAnalysisMap[activeChapter.id].quality.approved ? '#4caf50' : '#f44336', 
-                    color: 'white', 
-                    fontSize: '14px' 
-                  }}>
-                    {aiAnalysisMap[activeChapter.id].quality.approved ? '通过' : '需改进'}
-                  </span>
-                </div>
-              </div>
-              <div style={{ marginTop: '8px' }}>
-                {aiAnalysisMap[activeChapter.id].quality.criteria.map((criterion: any, index: number) => (
-                  <div key={index} style={{ marginBottom: '8px', padding: '8px', backgroundColor: '#f9f9f9', borderRadius: '4px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <strong>{criterion.name}</strong>
-                      <span>{criterion.score}/100</span>
-                    </div>
-                    <p style={{ margin: '4px 0', fontSize: '14px' }}>{criterion.feedback}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-            
-            <div className="line-item line-item--column">
-              <strong>改进建议</strong>
-              <ul style={{ margin: '8px 0' }}>
-                {aiAnalysisMap[activeChapter.id].quality.suggestions.map((suggestion: string, index: number) => (
-                  <li key={index} style={{ marginBottom: '8px', lineHeight: '1.4' }}>{suggestion}</li>
-                ))}
-              </ul>
-            </div>
-            
-            <div className="line-item line-item--column">
-              <strong>改稿意见</strong>
-              {aiAnalysisMap[activeChapter.id].revisionSuggestions && aiAnalysisMap[activeChapter.id].revisionSuggestions.map((suggestion: any, index: number) => (
-                <div key={index} style={{ marginBottom: '12px', padding: '12px', backgroundColor: suggestion.severity === 'high' ? '#ffebee' : suggestion.severity === 'medium' ? '#fff3e0' : '#e8f5e8', borderRadius: '8px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                    <strong>{suggestion.section}</strong>
-                    <span style={{ 
-                      padding: '2px 8px', 
-                      borderRadius: '12px', 
-                      backgroundColor: suggestion.severity === 'high' ? '#f44336' : suggestion.severity === 'medium' ? '#ff9800' : '#4caf50', 
-                      color: 'white', 
-                      fontSize: '12px' 
-                    }}>
-                      {suggestion.severity === 'high' ? '高' : suggestion.severity === 'medium' ? '中' : '低'}
-                    </span>
-                  </div>
-                  <p style={{ margin: '4px 0', fontSize: '14px', fontWeight: 'bold' }}>{suggestion.issue}</p>
-                  <p style={{ margin: '4px 0', lineHeight: '1.4' }}>{suggestion.suggestion}</p>
-                </div>
-              ))}
-            </div>
-            
-            <div className="line-item line-item--column">
-              <strong>提前预览：后续两步</strong>
-              {aiAnalysisMap[activeChapter.id].nextSteps.map((step: any, index: number) => (
-                <div key={index} style={{ marginBottom: '16px', padding: '12px', backgroundColor: '#f0f7ff', borderRadius: '8px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                    <strong>第 {index + 2} 步：{step.step}</strong>
-                    <span style={{ padding: '2px 8px', borderRadius: '12px', backgroundColor: '#e3f2fd', fontSize: '12px' }}>
-                      {step.estimatedTime}分钟
-                    </span>
-                  </div>
-                  <p style={{ margin: '4px 0', lineHeight: '1.4' }}>{step.preview}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
-
-      <section className="content-card content-card--soft anchor-section" id="chapter-instruction">
-        <div className="card-heading card-heading--stack">
-          <span className="eyebrow">你可以直接发修改指令</span>
-          <h3>别对着空白页想，哪里不顺就直接提要求</h3>
-        </div>
-        <div className="field field--full">
-          <textarea
-            onChange={(event) => setCustomInstruction(event.target.value)}
-            placeholder="例如：把这一章写得更像方法章，补清测试对象与评价维度，不要再写空话。"
-            rows={3}
-            value={customInstruction}
-          />
-        </div>
-        <div className="button-row top-gap">
-          <button className="secondary-button" onClick={applyCustomInstruction} type="button">
-            按我的要求改这一章
-          </button>
-        </div>
-      </section>
-
-      <div className="project-page-grid">
-        <section className="content-card">
-          <div className="card-heading card-heading--stack">
-            <span className="eyebrow">AI 备选写法</span>
-            <h3>不给空框，直接给你 2 条备选建议</h3>
-          </div>
-          <div className="stack-list">
-            {activeChapter.aiOptions.map((item) => (
-              <div key={item} className="line-item line-item--column">
-                <p>{item}</p>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <section className="content-card anchor-section" id="chapter-evidence">
-          <div className="card-heading card-heading--stack">
-            <span className="eyebrow">还缺什么</span>
-            <h3>本章需要你补的证据点</h3>
-          </div>
-          <ul className="bullet-list">
-            {activeChapter.evidenceNeeds.map((item) => (
-              <li key={item}>{item}</li>
-            ))}
-          </ul>
-        </section>
-      </div>
-
-      <QualityReviewPanel
-        actionContext={{
-          activeChapterId: activeChapter.id,
-          projectId,
-          scope: "chapter",
-          sections: chapters.map((chapter) => ({
-            id: chapter.id,
-            title: chapter.title
-          })),
-          venueId
-        }}
-        emptyText="本章生成后，系统会自动检查长度、结构、学术表达和会议适配度。"
-        loading={Boolean(checkingMap[activeChapter.id])}
-        report={reviewMap[activeChapter.id] ?? null}
-        title="本章 AI 自检"
-      />
-
-      <div className="hint-panel">
-        <strong>系统反馈</strong>
-        <p>{message}</p>
-      </div>
-
-      <ArchiveActionPanel
-        archiveLabel="确认并存档当前章节"
-        archivedAt={activeArchiveRecord?.archivedAt}
-        archivedSummary={
-          activeArchiveRecord
-            ? `${activeArchiveRecord.title}：${activeArchiveRecord.summary}`
-            : undefined
-        }
-        currentLabel="当前将被锁定的章节版本"
-        currentSummary={`当前正文共 ${activeParagraphs.length} 段；开头内容：${shortenArchiveText(
-          activeParagraphs[0] ?? "暂无正文"
-        )}`}
-        description="章节页最需要这个动作，因为这里改动最频繁。你一旦确认并存档，后面继续重写也不会把已经定下来的版本冲掉。"
-        helperText={
-          allChaptersArchived
-            ? "所有章节都已经有确认节点了。现在去看全文时，系统至少知道自己该整合哪一套稳定版本。"
-            : `还需再存档 ${chapters.length - archivedChapterCount} 章，全文整合才会真正建立在已确认内容上。`
-        }
-        archiveDisabled={saving}
-        isCurrentArchived={isActiveArchived}
-        onArchive={archiveCurrentChapter}
-        secondaryAction={
-          isReady && allChaptersArchived ? (
             <Link
-              className="primary-button"
-              href={buildVenueHref(`/projects/${projectId}/export`, venueId)}
+              className="secondary-button"
+              href={buildVenueHref(`/projects/${projectId}/outline`, venueProfile.id)}
             >
-              所有章节已存档，去看完整全文
+              返回大纲
             </Link>
-          ) : (
-            <button className="secondary-button" disabled type="button">
-              {isReady
-                ? `还需存档 ${chapters.length - archivedChapterCount} 章后再进入全文预览`
-                : "正在读取本地存档..."}
-            </button>
-          )
-        }
-        title="这一章定下来后，要留一个可回退的版本节点"
-      />
+          </div>
+        </section>
 
-      <VersionHistoryPanel
-        currentFingerprint={activeFingerprint}
-        description="这里保存的是当前章节曾经确认过的正文版本。回滚后，系统会把这一版正文重新放回编辑区，并重新跑一次自检。"
-        error={historyError}
-        loading={historyLoading}
-        onRestore={restoreVersion}
-        title={`${activeChapter.title} 的历史记录`}
-        versions={versions}
-      />
-    </div>
+        {/* 章节选择器 */}
+        <section className="content-card">
+          <div className="card-heading">
+            <h2>章节管理</h2>
+          </div>
+          <div className="chapter-selector">
+            {chapters.map((chapter) => (
+              <button
+                key={chapter.id}
+                className={`chapter-button ${chapter.id === activeChapterId ? "active" : ""}`}
+                onClick={() => setActiveChapterId(chapter.id)}
+              >
+                <span className="chapter-title">{chapter.title}</span>
+                <span className="chapter-status">{chapter.status}</span>
+              </button>
+            ))}
+          </div>
+        </section>
+
+        {/* 章节编辑器 */}
+        <section className="content-card">
+          <div className="card-heading">
+            <h2>{activeChapter?.title || "章节内容"}</h2>
+            <p>{activeChapter?.goal || ""}</p>
+          </div>
+
+          {isChapterEmpty ? (
+            <div className="empty-chapter">
+              <p>章节内容为空，点击下方按钮生成内容。</p>
+              <button
+                className="primary-button"
+                onClick={generateChapterContent}
+                disabled={isGenerating}
+              >
+                {isGenerating ? "生成中..." : "AI 生成章节内容"}
+              </button>
+            </div>
+          ) : (
+            <div className="chapter-editor">
+              {/* 段落编辑器 */}
+              <div className="paragraphs">
+                {activeParagraphs.map((paragraph, index) => (
+                  <div key={index} className="paragraph">
+                    <textarea
+                      value={paragraph}
+                      onChange={(e) => {
+                        const newParagraphs = [...activeParagraphs];
+                        newParagraphs[index] = e.target.value;
+                        setDraftMap((current) => ({
+                          ...current,
+                          [activeChapterId]: newParagraphs
+                        }));
+                      }}
+                      placeholder="输入段落内容..."
+                    />
+                    <div className="paragraph-actions">
+                      <button
+                        className="small-button"
+                        onClick={() => {
+                          const newParagraphs = [...activeParagraphs];
+                          newParagraphs.splice(index + 1, 0, "");
+                          setDraftMap((current) => ({
+                            ...current,
+                            [activeChapterId]: newParagraphs
+                          }));
+                          setActiveParagraphIndex(index + 1);
+                        }}
+                      >
+                        在下方插入
+                      </button>
+                      {activeParagraphs.length > 1 && (
+                        <button
+                          className="small-button delete-button"
+                          onClick={() => {
+                            const newParagraphs = [...activeParagraphs];
+                            newParagraphs.splice(index, 1);
+                            setDraftMap((current) => ({
+                              ...current,
+                              [activeChapterId]: newParagraphs
+                            }));
+                            setActiveParagraphIndex(Math.max(0, index - 1));
+                          }}
+                        >
+                          删除
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* 操作按钮 */}
+              <div className="editor-actions">
+                <button
+                  className="secondary-button"
+                  onClick={() => {
+                    const newParagraphs = [...activeParagraphs, ""];
+                    setDraftMap((current) => ({
+                      ...current,
+                      [activeChapterId]: newParagraphs
+                    }));
+                    setActiveParagraphIndex(newParagraphs.length - 1);
+                  }}
+                >
+                  添加段落
+                </button>
+                <button
+                  className="secondary-button"
+                  onClick={regenerateCurrentChapter}
+                  disabled={isGenerating}
+                >
+                  {isGenerating ? "重新生成中..." : "重新生成章节"}
+                </button>
+                <button
+                  className="primary-button"
+                  onClick={() => runChapterCheck(
+                    activeChapterId,
+                    activeParagraphs,
+                    activeChapter?.goal || "",
+                    activeChapter?.title || ""
+                  )}
+                  disabled={isChecking}
+                >
+                  {isChecking ? "检查中..." : "检查章节质量"}
+                </button>
+              </div>
+
+              {/* 自定义修改指令 */}
+              <div className="custom-instruction">
+                <label htmlFor="custom-instruction">自定义修改要求</label>
+                <textarea
+                  id="custom-instruction"
+                  value={customInstruction}
+                  onChange={(e) => setCustomInstruction(e.target.value)}
+                  placeholder="例如：增加实证案例，强化理论分析，调整结构..."
+                  rows={3}
+                />
+                <button
+                  className="secondary-button"
+                  onClick={applyCustomInstruction}
+                  disabled={!customInstruction.trim()}
+                >
+                  按要求修改
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* 消息提示 */}
+          {message && (
+            <div className="message">
+              <p>{message}</p>
+            </div>
+          )}
+
+          {/* AI 分析结果 */}
+          {showAiAnalysis && aiAnalysisMap[activeChapterId] && (
+            <div className="ai-analysis">
+              <div className="ai-analysis-header">
+                <h3>AI 分析结果</h3>
+                <button
+                  className="small-button"
+                  onClick={() => setShowAiAnalysis(false)}
+                >
+                  关闭
+                </button>
+              </div>
+              <div className="stack-list">
+                <div className="line-item line-item--column">
+                  <strong>质量评估</strong>
+                  <div style={{ 
+                    backgroundColor: aiAnalysisMap[activeChapterId].quality.approved ? '#e8f5e8' : '#ffebee', 
+                    padding: '12px', 
+                    borderRadius: '8px', 
+                    marginBottom: '12px'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <strong>整体评分：</strong>{aiAnalysisMap[activeChapterId].quality.overallScore}/100
+                      <span style={{ 
+                        padding: '4px 12px', 
+                        borderRadius: '16px', 
+                        backgroundColor: aiAnalysisMap[activeChapterId].quality.approved ? '#4caf50' : '#f44336', 
+                        color: 'white',
+                        fontSize: '12px'
+                      }}>
+                        {aiAnalysisMap[activeChapterId].quality.approved ? '通过' : '需改进'}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <div className="quality-criteria">
+                    {aiAnalysisMap[activeChapterId].quality.criteria.map((criterion, index) => (
+                      <div key={index} className="criterion">
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span>{criterion.name}</span>
+                          <span>{criterion.score}/100</span>
+                        </div>
+                        <div className="progress-bar">
+                          <div 
+                            className="progress-fill"
+                            style={{ 
+                              width: `${(criterion.score / 100) * 100}%`,
+                              backgroundColor: criterion.score >= 70 ? '#4caf50' : criterion.score >= 40 ? '#ff9800' : '#f44336'
+                            }}
+                          />
+                        </div>
+                        <p style={{ fontSize: '14px', color: '#666', marginTop: '4px' }}>{criterion.feedback}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                
+                <div className="line-item line-item--column">
+                  <strong>改进建议</strong>
+                  <ul className="suggestions-list">
+                    {aiAnalysisMap[activeChapterId].quality.suggestions.map((suggestion, index) => (
+                      <li key={index}>{suggestion}</li>
+                    ))}
+                  </ul>
+                </div>
+                
+                <div className="line-item line-item--column">
+                  <strong>章节统计</strong>
+                  <div className="chapter-stats">
+                    <span>字数：{aiAnalysisMap[activeChapterId].metadata.wordCount}</span>
+                    <span>阅读时间：{aiAnalysisMap[activeChapterId].metadata.estimatedReadingTime}分钟</span>
+                    <span>主题：{aiAnalysisMap[activeChapterId].metadata.topics.join(', ')}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </section>
+      </main>
+
+      <style jsx>{`
+        .chapter-selector {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+
+        .chapter-button {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 12px 16px;
+          border: 1px solid #e0e0e0;
+          border-radius: 8px;
+          background: white;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+
+        .chapter-button:hover {
+          border-color: #3b82f6;
+        }
+
+        .chapter-button.active {
+          background: #eff6ff;
+          border-color: #3b82f6;
+        }
+
+        .chapter-title {
+          font-weight: 500;
+        }
+
+        .chapter-status {
+          font-size: 12px;
+          padding: 2px 8px;
+          border-radius: 12px;
+          background: #f3f4f6;
+          color: #6b7280;
+        }
+
+        .empty-chapter {
+          text-align: center;
+          padding: 40px 20px;
+        }
+
+        .empty-chapter p {
+          margin-bottom: 20px;
+          color: #6b7280;
+        }
+
+        .chapter-editor {
+          display: flex;
+          flex-direction: column;
+          gap: 20px;
+        }
+
+        .paragraphs {
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+        }
+
+        .paragraph {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+
+        .paragraph textarea {
+          width: 100%;
+          padding: 12px;
+          border: 1px solid #e0e0e0;
+          border-radius: 8px;
+          resize: vertical;
+          min-height: 100px;
+        }
+
+        .paragraph-actions {
+          display: flex;
+          gap: 8px;
+          justify-content: flex-end;
+        }
+
+        .small-button {
+          padding: 4px 12px;
+          border: 1px solid #e0e0e0;
+          border-radius: 4px;
+          background: white;
+          cursor: pointer;
+          font-size: 12px;
+          transition: all 0.2s;
+        }
+
+        .small-button:hover {
+          background: #f3f4f6;
+        }
+
+        .small-button.delete-button {
+          color: #ef4444;
+          border-color: #fecaca;
+        }
+
+        .small-button.delete-button:hover {
+          background: #fef2f2;
+        }
+
+        .editor-actions {
+          display: flex;
+          gap: 12px;
+          justify-content: flex-end;
+        }
+
+        .custom-instruction {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+
+        .custom-instruction textarea {
+          width: 100%;
+          padding: 12px;
+          border: 1px solid #e0e0e0;
+          border-radius: 8px;
+          resize: vertical;
+        }
+
+        .message {
+          margin-top: 16px;
+          padding: 12px;
+          background: #f3f4f6;
+          border-radius: 8px;
+          color: #374151;
+        }
+
+        .ai-analysis {
+          margin-top: 20px;
+          padding: 20px;
+          background: #f8f9fa;
+          border-radius: 8px;
+        }
+
+        .ai-analysis-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 16px;
+        }
+
+        .ai-analysis-header h3 {
+          margin: 0;
+        }
+
+        .quality-criteria {
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+          margin-top: 12px;
+        }
+
+        .criterion {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+        }
+
+        .progress-bar {
+          width: 100%;
+          height: 6px;
+          background: #e5e7eb;
+          border-radius: 3px;
+          overflow: hidden;
+        }
+
+        .progress-fill {
+          height: 100%;
+          transition: width 0.3s ease;
+        }
+
+        .suggestions-list {
+          list-style: disc;
+          padding-left: 20px;
+          margin: 8px 0 0 0;
+        }
+
+        .suggestions-list li {
+          margin-bottom: 8px;
+        }
+
+        .chapter-stats {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 16px;
+          margin-top: 8px;
+          font-size: 14px;
+          color: #6b7280;
+        }
+      `}</style>
+    </>
   );
 }

@@ -3502,11 +3502,20 @@ textarea:focus {
   border-radius: var(--radius-lg);
   border: 1px solid var(--border);
   box-shadow: var(--shadow);
-  padding: var(--space-md);
+  padding: 16px;
   margin-top: 8px;
   max-height: 400px;
   overflow-y: auto;
-  display: block !important;
+  box-sizing: border-box;
+}
+
+.paper-type-dropdown__menu .choice-card {
+  margin-bottom: 8px;
+  cursor: pointer;
+}
+
+.paper-type-dropdown__menu .choice-card:last-child {
+  margin-bottom: 0;
 }
 
 .choice-card {

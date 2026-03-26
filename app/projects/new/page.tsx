@@ -6,36 +6,24 @@ import { useState, useEffect } from "react";
 import { VenueRuleSelector } from "@/components/venue-rule-selector";
 
 type AiAnalysisResult = {
-  thinking: {
-    thoughts: string;
-    prompt: string;
-    reasoning: string;
-    confidence: number;
-  };
+  ok: boolean;
   content: {
     content: string;
-    sections: Record<string, string>;
+    sections?: Record<string, string>;
     metadata: {
-      wordCount: number;
-      estimatedReadingTime: number;
-      topics: string[];
+      analysis?: string;
+      directions?: Array<{
+        id: string;
+        label: string;
+        description: string;
+        confidence: number;
+      }>;
+      wordCount?: number;
+      estimatedReadingTime?: number;
+      topics?: string[];
     };
   };
-  quality: {
-    overallScore: number;
-    criteria: Array<{
-      name: string;
-      score: number;
-      feedback: string;
-    }>;
-    suggestions: string[];
-    approved: boolean;
-  };
-  nextSteps: Array<{
-    step: string;
-    preview: string;
-    estimatedTime: number;
-  }>;
+  error?: string;
 };
 
 export default function NewProjectPage() {
@@ -125,6 +113,11 @@ export default function NewProjectPage() {
           context: {
             field,
             currentValue,
+            projectId: "new",
+            projectTitle: title,
+            venueId: venueId,
+            currentStep: "project_creation",
+            previousSteps: [],
             userInputs: {
               title,
               subject,
@@ -136,30 +129,24 @@ export default function NewProjectPage() {
         })
       });
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
       const data = await response.json();
 
       if (!data.ok) {
         throw new Error(data.error || "AI 填充失败");
       }
 
-      const filledValue = data.content?.sections?.[field] || data.content?.content || "";
-      
       switch (field) {
         case "title":
-          setTitle(filledValue);
+          setTitle(data.content.sections?.title || data.content.content);
           break;
         case "subject":
-          setSubject(filledValue);
+          setSubject(data.content.sections?.subject || data.content.content);
           break;
         case "keywords":
-          setKeywords(filledValue);
+          setKeywords(data.content.sections?.keywords || data.content.content);
           break;
         case "description":
-          setDescription(filledValue);
+          setDescription(data.content.sections?.description || data.content.content);
           break;
       }
     } catch (err) {
@@ -169,8 +156,14 @@ export default function NewProjectPage() {
     }
   }
 
-  async function handleSubmit(event: React.FormEvent) {
-    event.preventDefault();
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+
+    if (!title.trim()) {
+      setError("请输入研究主题");
+      return;
+    }
+
     setIsSubmitting(true);
     setError("");
 
@@ -182,19 +175,24 @@ export default function NewProjectPage() {
         },
         body: JSON.stringify({
           title,
+          subject,
+          keywords,
           description,
           venueId
         })
       });
 
-      const data = await response.json();
-
-      if (!data.ok) {
-        throw new Error(data.error || "创建项目失败");
+      if (!response.ok) {
+        throw new Error("创建项目失败");
       }
 
-      // 跳转到项目页面
-      window.location.href = `/projects/${data.project.id}/profile?venue=${venueId}`;
+      const data = await response.json();
+
+      if (data.ok && data.projectId) {
+        window.location.href = `/projects/${data.projectId}/outline`;
+      } else {
+        throw new Error("创建项目失败");
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "创建项目失败");
     } finally {
@@ -202,256 +200,217 @@ export default function NewProjectPage() {
     }
   }
 
-  useEffect(() => {
-    // 当用户输入变化时，自动触发AI分析
-    const timer = setTimeout(() => {
-      if (title && description && !isAnalyzing) {
-        analyzeWithAi();
-      }
-    }, 2000);
-
-    return () => clearTimeout(timer);
-  }, [title, description, keywords, subject, venueId]);
-
   return (
-    <main className="single-panel-page">
-      <section className="hero-card hero-card--compact">
-        <div className="page-intro page-intro--stack">
-          <div>
-            <span className="eyebrow">第 1 步 / 共 6 步</span>
-            <h1>新建论文项目</h1>
-            <p>AI 驱动的论文创作流程：输入你的研究想法，AI 会分析并生成相关建议，帮助你更好地规划论文。</p>
-          </div>
-          <Link className="secondary-button" href="/">
-            返回项目首页
-          </Link>
-        </div>
-        <div className="mobile-step-strip top-gap">
-          <span className="wizard-step active">1 定主题和方向</span>
-          <span className="wizard-step">2 AI 分析与建议</span>
-          <span className="wizard-step">3 判断题目类型</span>
-          <span className="wizard-step">4 拆论文框架</span>
-          <span className="wizard-step">5 分章节写作</span>
-          <span className="wizard-step">6 输出全文</span>
+    <main className="page-main">
+      <section className="hero-card">
+        <div className="page-intro">
+          <h1>创建新项目</h1>
+          <p>填写以下信息来创建一个新的论文项目，AI 将为您提供智能分析和建议。</p>
         </div>
       </section>
 
-      <section className="form-card">
-        <div className="card-heading card-heading--stack">
-          <span className="eyebrow">研究主题</span>
-          <h2>先告诉系统你想研究什么</h2>
-        </div>
-
-        <form onSubmit={handleSubmit} className="form-grid">
-          <label className="field">
-            <span>论文主题</span>
-            <div className="field-with-ai">
-              <input 
-                value={title} 
-                onChange={(e) => setTitle(e.target.value)}
-                required
-              />
-              <button 
-                type="button" 
-                className="ai-fill-button"
-                onClick={() => fillWithAi("title", title)}
-                disabled={aiFilling.title}
-              >
-                {aiFilling.title ? "AI 生成中..." : "AI 填写"}
-              </button>
-            </div>
-            <small>这是研究核心问题，后面的题目类型和框架都会基于它判断。</small>
-          </label>
-
-          <label className="field">
-            <span>研究对象</span>
-            <div className="field-with-ai">
-              <input 
-                value={subject} 
-                onChange={(e) => setSubject(e.target.value)}
-              />
-              <button 
-                type="button" 
-                className="ai-fill-button"
-                onClick={() => fillWithAi("subject", subject)}
-                disabled={aiFilling.subject}
-              >
-                {aiFilling.subject ? "AI 生成中..." : "AI 填写"}
-              </button>
-            </div>
-            <small>比如服装产品、用户群体、文化元素、实验对象等。</small>
-          </label>
-
-          <label className="field field--full">
-            <span>关键词</span>
-            <div className="field-with-ai">
-              <input 
-                value={keywords} 
-                onChange={(e) => setKeywords(e.target.value)}
-              />
-              <button 
-                type="button" 
-                className="ai-fill-button"
-                onClick={() => fillWithAi("keywords", keywords)}
-                disabled={aiFilling.keywords}
-              >
-                {aiFilling.keywords ? "AI 生成中..." : "AI 填写"}
-              </button>
-            </div>
-            <small>先写你现在脑子里最确定的 3 到 5 个词，后面还能继续改。</small>
-          </label>
-
-          <label className="field field--full">
-            <span>已有想法说明</span>
-            <div className="field-with-ai field-with-ai--textarea">
-              <textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                rows={6}
-              />
-              <button 
-                type="button" 
-                className="ai-fill-button"
-                onClick={() => fillWithAi("description", description)}
-                disabled={aiFilling.description}
-              >
-                {aiFilling.description ? "AI 生成中..." : "AI 填写"}
-              </button>
-            </div>
-            <small>这里写自然语言就行，不需要一开始就写成学术表达。</small>
-          </label>
-
-          {error && (
-            <div className="field field--full">
-              <div className="error-message">
-                <strong>提示：</strong>{error}
-                {error.includes("未授权") && (
-                  <span className="error-hint">
-                    请检查 AI 服务配置或稍后重试
-                  </span>
-                )}
-              </div>
-            </div>
-          )}
-
-          <div className="field field--full">
-            <button 
-              type="button" 
-              className="secondary-button button-spaced" 
-              onClick={analyzeWithAi}
-              disabled={isAnalyzing}
-            >
-              {isAnalyzing ? "AI 分析中..." : "AI 分析我的想法"}
-            </button>
-            <button 
-              type="submit" 
-              className="primary-button" 
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? "创建中..." : "创建项目"}
-            </button>
-          </div>
-        </form>
-      </section>
-
-      {aiAnalysis && (
+      <div className="workbench-stack">
         <section className="content-card">
-          <div className="card-heading card-heading--stack">
-            <span className="eyebrow">AI 分析结果</span>
-            <h2>AI 对您研究主题的分析和建议</h2>
-            <p>AI 已完成深度分析，包括思考过程、内容生成、质量检查和下一步预测。</p>
+          <div className="card-heading">
+            <h2>项目基本信息</h2>
           </div>
-          
-          <div className="stack-list">
-            <div className="line-item line-item--column">
-              <strong>AI 思考过程</strong>
-              <div className="ai-thinking">
-                <p>{aiAnalysis.thinking.thoughts}</p>
-                <div className="ai-thinking-meta">
-                  <strong>置信度：</strong>{aiAnalysis.thinking.confidence}/100
-                </div>
+
+          <form onSubmit={handleSubmit} className="form-grid">
+            <div className="form-group">
+              <label htmlFor="title">研究主题 <span className="required">*</span></label>
+              <div className="input-with-button">
+                <input
+                  id="title"
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="请输入研究主题"
+                  required
+                />
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={() => fillWithAi("title", title)}
+                  disabled={aiFilling.title}
+                >
+                  {aiFilling.title ? "AI 填写中..." : "AI 填写"}
+                </button>
               </div>
             </div>
-            
-            <div className="line-item line-item--column">
-              <strong>研究主题分析</strong>
-              <p>{aiAnalysis.content.content}</p>
-              <div className="ai-metadata">
-                <strong>字数：</strong>{aiAnalysis.content.metadata.wordCount} | 
-                <strong>阅读时间：</strong>{aiAnalysis.content.metadata.estimatedReadingTime}分钟 | 
-                <strong>主题：</strong>{aiAnalysis.content.metadata.topics.join(', ')}
+
+            <div className="form-group">
+              <label htmlFor="subject">研究对象</label>
+              <div className="input-with-button">
+                <input
+                  id="subject"
+                  type="text"
+                  value={subject}
+                  onChange={(e) => setSubject(e.target.value)}
+                  placeholder="请输入研究对象"
+                />
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={() => fillWithAi("subject", subject)}
+                  disabled={aiFilling.subject}
+                >
+                  {aiFilling.subject ? "AI 填写中..." : "AI 填写"}
+                </button>
               </div>
             </div>
-            
-            <div className="line-item line-item--column">
-              <strong>质量评估</strong>
-              <div className={`ai-quality-assessment ${aiAnalysis.quality.approved ? 'approved' : 'needs-improvement'}`}>
-                <div className="ai-quality-header">
-                  <strong>整体评分：</strong>{aiAnalysis.quality.overallScore}/100
-                  <span className={`ai-quality-status ${aiAnalysis.quality.approved ? 'approved' : 'needs-improvement'}`}>
-                    {aiAnalysis.quality.approved ? '通过' : '需改进'}
-                  </span>
-                </div>
-              </div>
-              <div className="ai-criteria-list">
-                {aiAnalysis.quality.criteria.map((criterion, index) => (
-                  <div key={index} className="ai-criteria-item">
-                    <div className="ai-criteria-header">
-                      <strong>{criterion.name}</strong>
-                      <span>{criterion.score}/100</span>
-                    </div>
-                    <p className="ai-criteria-feedback">{criterion.feedback}</p>
-                  </div>
-                ))}
+
+            <div className="form-group">
+              <label htmlFor="keywords">关键词</label>
+              <div className="input-with-button">
+                <input
+                  id="keywords"
+                  type="text"
+                  value={keywords}
+                  onChange={(e) => setKeywords(e.target.value)}
+                  placeholder="请输入关键词，用逗号分隔"
+                />
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={() => fillWithAi("keywords", keywords)}
+                  disabled={aiFilling.keywords}
+                >
+                  {aiFilling.keywords ? "AI 填写中..." : "AI 填写"}
+                </button>
               </div>
             </div>
-            
-            <div className="line-item line-item--column">
-              <strong>改进建议</strong>
-              <ul className="ai-suggestions-list">
-                {aiAnalysis.quality.suggestions.map((suggestion, index) => (
-                  <li key={index}>{suggestion}</li>
-                ))}
-              </ul>
-            </div>
-            
-            <div className="line-item line-item--column">
-              <strong>提前预览：后续两步</strong>
-              <div className="ai-next-steps">
-                {aiAnalysis.nextSteps.map((step, index) => (
-                  <div key={index} className="ai-next-step-item">
-                    <div className="ai-next-step-header">
-                      <strong>第 {index + 2} 步：{step.step}</strong>
-                      <span className="ai-next-step-time">
-                        {step.estimatedTime}分钟
-                      </span>
-                    </div>
-                    <p className="ai-next-step-preview">{step.preview}</p>
-                  </div>
-                ))}
+
+            <div className="form-group">
+              <label htmlFor="description">研究描述</label>
+              <div className="input-with-button">
+                <textarea
+                  id="description"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="请简要描述您的研究内容和目标"
+                  rows={4}
+                ></textarea>
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={() => fillWithAi("description", description)}
+                  disabled={aiFilling.description}
+                >
+                  {aiFilling.description ? "AI 填写中..." : "AI 填写"}
+                </button>
               </div>
             </div>
-          </div>
+
+            <VenueRuleSelector
+              selectedVenueId={venueId}
+              onVenueChange={setVenueId}
+            />
+
+            {error && (
+              <div className="form-error">
+                <p>{error}</p>
+              </div>
+            )}
+
+            <div className="form-actions">
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={analyzeWithAi}
+                disabled={isAnalyzing || !title.trim()}
+              >
+                {isAnalyzing ? "AI 分析中..." : "AI 分析我的想法"}
+              </button>
+              <button
+                type="submit"
+                className="primary-button"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? "创建中..." : "创建项目"}
+              </button>
+            </div>
+          </form>
         </section>
-      )}
 
-      <section className="content-card">
-        <div className="helper-banner helper-banner--stack">
-          <div>
-            <strong>AI 驱动的论文创作流程</strong>
-            <p>AI 会分析你的研究想法，提供专业建议，并预测后续步骤的内容，帮助你更高效地完成论文。</p>
-          </div>
-          <Link className="secondary-button" href="/projects/atelier-zero/profile?venue=ieee-iccci-2026">
-            看下一步示例
-          </Link>
-        </div>
-      </section>
+        {aiAnalysis && (
+          <section className="content-card">
+            <div className="card-heading">
+              <span className="eyebrow">AI 分析结果</span>
+              <h2>AI 对您研究主题的分析和建议</h2>
+              <p>AI 已完成深度分析，包括研究方向和建议。</p>
+            </div>
+            
+            <div className="stack-list">
+              <div className="line-item line-item--column">
+                <strong>研究主题分析</strong>
+                <p>{aiAnalysis.content.content}</p>
+              </div>
+              
+              {aiAnalysis.content.metadata.directions && aiAnalysis.content.metadata.directions.length > 0 && (
+                <div className="line-item line-item--column">
+                  <strong>建议研究方向</strong>
+                  <div className="direction-list">
+                    {aiAnalysis.content.metadata.directions.map((direction, index) => (
+                      <div key={direction.id} className="direction-item">
+                        <h4>{index + 1}. {direction.label}</h4>
+                        <p>{direction.description}</p>
+                        <div className="direction-meta">
+                          <span>置信度: {direction.confidence}/100</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+      </div>
 
-      <VenueRuleSelector 
-        initialVenueId={venueId} 
-        projectHref="/projects/atelier-zero" 
-        onVenueChange={setVenueId}
-      />
+      <style jsx>{`
+        .input-with-button {
+          display: flex;
+          gap: 8px;
+        }
+
+        .input-with-button input,
+        .input-with-button textarea {
+          flex: 1;
+        }
+
+        .form-actions {
+          display: flex;
+          gap: 12px;
+          justify-content: flex-end;
+          margin-top: 24px;
+        }
+
+        .direction-list {
+          margin-top: 12px;
+        }
+
+        .direction-item {
+          background: #f8f9fa;
+          padding: 16px;
+          border-radius: 8px;
+          margin-bottom: 12px;
+        }
+
+        .direction-item h4 {
+          margin: 0 0 8px 0;
+          color: #333;
+        }
+
+        .direction-item p {
+          margin: 0 0 8px 0;
+          color: #666;
+        }
+
+        .direction-meta {
+          font-size: 14px;
+          color: #888;
+        }
+      `}</style>
     </main>
   );
 }

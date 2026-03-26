@@ -78,12 +78,8 @@ export function PaperTypeSelector({ onTypeChange, initialType }: PaperTypeSelect
           <StatusBadge tone="sage">{selectedProfile.category}</StatusBadge>
         </div>
 
-        <div className="top-gap paper-type-dropdown">
-          <button
-            className="choice-card"
-            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-            type="button"
-          >
+        <div className="top-gap">
+          <div className="choice-card" style={{ cursor: 'pointer' }} onClick={() => setIsDropdownOpen(!isDropdownOpen)}>
             <div className="line-item__head">
               <strong>点击选择论文类型</strong>
               <span className="paper-type__meta-text">
@@ -93,18 +89,30 @@ export function PaperTypeSelector({ onTypeChange, initialType }: PaperTypeSelect
             <p className="paper-type__description">
               EI会议 · SCI期刊 · 核心期刊 · 学位论文 · 学术会议 · 技术文章
             </p>
-          </button>
+          </div>
 
           {isDropdownOpen && (
-            <div className="stack-list top-gap paper-type-dropdown__menu">
+            <div className="stack-list top-gap" style={{ 
+              background: 'var(--surface)',
+              borderRadius: 'var(--radius-lg)',
+              border: '1px solid var(--border)',
+              boxShadow: 'var(--shadow)',
+              padding: '16px',
+              marginTop: '8px',
+              position: 'relative',
+              zIndex: '9999'
+            }}>
               {paperTypeProfiles.map((profile) => {
                 const isSelected = profile.id === selectedType;
                 return (
-                  <button
+                  <div 
                     key={profile.id}
                     className={isSelected ? "choice-card choice-card--active" : "choice-card"}
+                    style={{ 
+                      marginBottom: '8px',
+                      cursor: 'pointer'
+                    }}
                     onClick={() => handleTypeSelect(profile.id)}
-                    type="button"
                   >
                     <div className="line-item__head">
                       <strong>
@@ -116,7 +124,7 @@ export function PaperTypeSelector({ onTypeChange, initialType }: PaperTypeSelect
                       </StatusBadge>
                     </div>
                     <p className="paper-type__hint">{profile.description}</p>
-                  </button>
+                  </div>
                 );
               })}
             </div>

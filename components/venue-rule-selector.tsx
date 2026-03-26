@@ -1,14 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 
 import { StatusBadge } from "@/components/status-badge";
 import { buildVenueHref, venueProfiles, type VenueProfile } from "@/lib/venue-profiles";
 
 type VenueRuleSelectorProps = {
-  projectHref: string;
+  projectHref?: string;
   initialVenueId?: string;
+  selectedVenueId?: string;
   onVenueChange?: (venueId: string) => void;
 };
 
@@ -17,10 +18,18 @@ const publishers: Array<VenueProfile["publisher"]> = ["IEEE", "ACM", "Springer",
 export function VenueRuleSelector({
   projectHref,
   initialVenueId,
+  selectedVenueId: controlledVenueId,
   onVenueChange
 }: VenueRuleSelectorProps) {
   const [activePublisher, setActivePublisher] = useState<VenueProfile["publisher"]>("IEEE");
-  const [selectedVenueId, setSelectedVenueId] = useState(initialVenueId ?? "ieee-iccci-2026");
+  const [selectedVenueId, setSelectedVenueId] = useState(controlledVenueId ?? initialVenueId ?? "ieee-iccci-2026");
+  
+  // 当受控属性变化时更新内部状态
+  useEffect(() => {
+    if (controlledVenueId !== undefined) {
+      setSelectedVenueId(controlledVenueId);
+    }
+  }, [controlledVenueId]);
 
   const handleVenueChange = (venueId: string) => {
     setSelectedVenueId(venueId);
@@ -141,11 +150,13 @@ export function VenueRuleSelector({
               <li key={item}>{item}</li>
             ))}
           </ul>
-          <div className="button-row top-gap">
-            <Link className="primary-button" href={buildVenueHref(projectHref, selectedProfile.id)}>
-              用这套会议规则进入项目
-            </Link>
-          </div>
+          {projectHref && (
+            <div className="button-row top-gap">
+              <Link className="primary-button" href={buildVenueHref(projectHref, selectedProfile.id)}>
+                用这套会议规则进入项目
+              </Link>
+            </div>
+          )}
         </section>
       </div>
     </div>
