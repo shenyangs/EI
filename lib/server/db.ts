@@ -74,6 +74,14 @@ export const memoryStore: {
   users: []
 };
 
+// 数据库接口
+export interface Database {
+  run: (sql: string, params?: any[]) => Promise<void>;
+  get: (sql: string, params?: any[]) => Promise<any>;
+  all: (sql: string, params?: any[]) => Promise<any[]>;
+  lastID: number;
+}
+
 // SQL执行器类
 class SqlExecutor {
   private store: typeof memoryStore;
@@ -372,17 +380,64 @@ class SqlExecutor {
   }
 }
 
+// Supabase执行器类
+class SupabaseExecutor {
+  private supabase: any;
+
+  constructor(supabase: any) {
+    this.supabase = supabase;
+  }
+
+  // 执行 INSERT/UPDATE/DELETE 语句
+  async run(sql: string, params?: any[]): Promise<void> {
+    console.log('Executing SQL with Supabase:', sql, params);
+    // 这里需要实现Supabase的具体操作
+    // 由于Supabase使用的是REST API而不是SQL，需要将SQL语句转换为Supabase操作
+  }
+
+  // 执行单条SELECT语句
+  async get(sql: string, params?: any[]): Promise<any> {
+    console.log('Executing SQL with Supabase:', sql, params);
+    // 这里需要实现Supabase的具体操作
+    return null;
+  }
+
+  // 执行多条SELECT语句
+  async all(sql: string, params?: any[]): Promise<any[]> {
+    console.log('Executing SQL with Supabase:', sql, params);
+    // 这里需要实现Supabase的具体操作
+    return [];
+  }
+}
+
 export async function getDatabase() {
-  // 创建SQL执行器实例
-  const executor = new SqlExecutor(memoryStore);
+  const { getDatabaseConfig, createConnection } = await import('./database-config');
+  const config = getDatabaseConfig();
   
-  // 返回数据库接口
-  return {
-    run: executor.run.bind(executor),
-    get: executor.get.bind(executor),
-    all: executor.all.bind(executor),
-    lastID: 1
-  };
+  if (config.type === 'supabase') {
+    const connection = createConnection();
+    await connection.connect();
+    const supabase = connection.getConnection();
+    const executor = new SupabaseExecutor(supabase);
+    
+    return {
+      run: executor.run.bind(executor),
+      get: executor.get.bind(executor),
+      all: executor.all.bind(executor),
+      lastID: 1
+    };
+  } else {
+    // 创建SQL执行器实例
+    const executor = new SqlExecutor(memoryStore);
+    
+    // 返回数据库接口
+    return {
+      run: executor.run.bind(executor),
+      get: executor.get.bind(executor),
+      all: executor.all.bind(executor),
+      lastID: 1
+    };
+  }
 }
 
 export async function closeDatabase() {

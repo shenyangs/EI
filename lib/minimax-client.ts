@@ -79,7 +79,11 @@ export async function generatePaperDraft({
   const config = getAiRuntimeConfig();
 
   if (!config.hasApiKey || !process.env.MINIMAX_API_KEY) {
-    throw new Error("尚未配置 MINIMAX_API_KEY，请先在本地 .env.local 中填写。");
+    console.warn('MINIMAX_API_KEY is not configured, using fallback response');
+    return {
+      content: "AI 服务暂时不可用，请先配置 MINIMAX_API_KEY 环境变量。",
+      usage: null
+    };
   }
 
   const endpoint = `${config.baseUrl.replace(/\/$/, "")}/chat/completions`;

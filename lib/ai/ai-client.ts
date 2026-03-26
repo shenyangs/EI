@@ -250,6 +250,10 @@ function createDefaultModelFromEnv(): AIModel | null {
   const apiKey = process.env.MINIMAX_API_KEY;
   
   if (!apiKey) {
+    console.warn('MINIMAX_API_KEY is not configured');
+  }
+  
+  if (!apiKey) {
     return null;
   }
   

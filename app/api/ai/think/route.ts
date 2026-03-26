@@ -1,5 +1,8 @@
-import { NextResponse } from "next/server";
+
 import { AiTaskType, AiTaskContext, orchestrateAIRequest, AiOrchestrator } from "@/lib/ai/ai-orchestrator";
+
+export const maxDuration = 60;
+export const runtime = 'edge';
 
 type ThinkRequest = {
   taskType: AiTaskType | 'fill_field';
@@ -27,23 +30,23 @@ export async function POST(request: Request) {
   try {
     body = (await request.json()) as ThinkRequest;
   } catch {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: "请求体不是合法 JSON。"
-      },
-      { status: 400 }
-    );
+    return new Response(JSON.stringify({
+      ok: false,
+      error: "请求体不是合法 JSON。"
+    }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 
   if (!body.taskType || !body.context) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: "缺少必要的任务类型和上下文信息。"
-      },
-      { status: 400 }
-    );
+    return new Response(JSON.stringify({
+      ok: false,
+      error: "缺少必要的任务类型和上下文信息。"
+    }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 
   try {
@@ -54,86 +57,140 @@ export async function POST(request: Request) {
       case 'fill_field':
         // 字段填充 - 为特定字段生成内容
         result = await fillField(body);
-        return NextResponse.json(result);
+        break;
         
       case 'topic_analysis':
         // 主题分析 - 基于用户输入的详细信息生成研究方向
         result = await generateTopicAnalysis(body);
-        return NextResponse.json(result);
+        break;
         
       case 'outline_generation':
         // 大纲生成 - 基于选择的方向生成详细大纲
         result = await generateOutline(body);
-        return NextResponse.json(result);
+        break;
         
       case 'project_initialization':
         // 项目初始化分析 - 全面分析用户输入
         result = await generateProjectAnalysis(body);
-        return NextResponse.json(result);
+        break;
         
       case 'content_generation':
       case 'quality_review':
       case 'revision_suggestions':
         // 这些任务需要 content 字段
         if (!body.content) {
-          return NextResponse.json(
-            {
-              ok: false,
-              error: "该任务类型需要提供内容。"
-            },
-            { status: 400 }
-          );
+          return new Response(JSON.stringify({
+            ok: false,
+            error: "该任务类型需要提供内容。"
+          }), {
+            status: 400,
+            headers: { 'Content-Type': 'application/json' }
+          });
         }
         try {
           result = await AiOrchestrator.runTask(body.taskType, body.content, body.context);
-          return NextResponse.json(result);
         } catch (error) {
           console.warn('AI runTask failed, using fallback:', error);
-          return NextResponse.json({
+          result = {
             ok: true,
             content: {
               content: "AI 服务暂时不可用，请稍后重试。",
               metadata: {}
             }
-          });
+          };
         }
+        break;
         
       default:
         // 使用旧的 runTask 方法处理其他任务
         if (!body.content) {
-          return NextResponse.json(
-            {
-              ok: false,
-              error: "该任务类型需要提供内容。"
-            },
-            { status: 400 }
-          );
+          return new Response(JSON.stringify({
+            ok: false,
+            error: "该任务类型需要提供内容。"
+          }), {
+            status: 400,
+            headers: { 'Content-Type': 'application/json' }
+          });
         }
         try {
           result = await AiOrchestrator.runTask(body.taskType, body.content, body.context);
-          return NextResponse.json(result);
         } catch (error) {
           console.warn('AI runTask failed, using fallback:', error);
-          return NextResponse.json({
+          result = {
             ok: true,
             content: {
               content: "AI 服务暂时不可用，请稍后重试。",
               metadata: {}
             }
-          });
+          };
         }
+        break;
     }
+
+    // 生成流式响应
+    let content: string;
+    try {
+      // 尝试从不同的结构中获取内容
+      if (Array.isArray(result)) {
+        content = JSON.stringify(result);
+      } else if ((result as any).content) {
+        const resultContent = (result as any).content;
+        if (typeof resultContent === 'string') {
+          content = resultContent;
+        } else if (resultContent.content) {
+          content = resultContent.content;
+        } else {
+          content = JSON.stringify(resultContent);
+        }
+      } else if ((result as any).data) {
+        content = JSON.stringify((result as any).data);
+      } else {
+        content = JSON.stringify(result);
+      }
+    } catch {
+      content = JSON.stringify(result);
+    }
+    
+    const stream = new ReadableStream({
+      async start(controller) {
+        for (let i = 0; i < content.length; i++) {
+          controller.enqueue(new TextEncoder().encode(content[i]));
+          await new Promise(resolve => setTimeout(resolve, 10));
+        }
+        controller.close();
+      }
+    });
+
+    return new Response(stream, {
+      headers: {
+        'Content-Type': 'text/plain',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive'
+      }
+    });
   } catch (error) {
     console.error('Unexpected error in think route:', error);
     const message = error instanceof Error ? error.message : "AI 思考过程失败。";
 
-    return NextResponse.json(
-      {
-        ok: false,
-        error: message
-      },
-      { status: 500 }
-    );
+    const fallbackContent = `AI 处理失败: ${message}`;
+
+    const stream = new ReadableStream({
+      async start(controller) {
+        for (let i = 0; i < fallbackContent.length; i++) {
+          controller.enqueue(new TextEncoder().encode(fallbackContent[i]));
+          await new Promise(resolve => setTimeout(resolve, 10));
+        }
+        controller.close();
+      }
+    });
+
+    return new Response(stream, {
+      headers: {
+        'Content-Type': 'text/plain',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive'
+      }
+    });
   }
 }
 

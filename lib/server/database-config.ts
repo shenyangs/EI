@@ -2,8 +2,9 @@
 // 支持从内存存储迁移到持久化数据库
 
 import { logger } from './logger';
+import { createClient } from '@supabase/supabase-js';
 
-export type DatabaseType = 'memory' | 'sqlite' | 'postgresql' | 'mysql';
+export type DatabaseType = 'memory' | 'sqlite' | 'postgresql' | 'mysql' | 'supabase';
 
 export interface DatabaseConfig {
   type: DatabaseType;
@@ -15,6 +16,8 @@ export interface DatabaseConfig {
   password?: string;
   ssl?: boolean;
   poolSize?: number;
+  supabaseUrl?: string;
+  supabaseKey?: string;
 }
 
 // 数据库表结构定义
@@ -346,6 +349,13 @@ export class DatabaseConnection {
           // this.connection = new Database(this.config.connectionString || './data.db');
           break;
 
+        case 'supabase':
+          if (!this.config.supabaseUrl || !this.config.supabaseKey) {
+            throw new Error('Supabase URL and key are required');
+          }
+          this.connection = createClient(this.config.supabaseUrl, this.config.supabaseKey);
+          break;
+
         default:
           throw new Error(`Unsupported database type: ${this.config.type}`);
       }
@@ -397,7 +407,9 @@ export class DatabaseConfigManager {
       username: process.env.DB_USER,
       password: process.env.DB_PASSWORD,
       ssl: process.env.DB_SSL === 'true',
-      poolSize: process.env.DB_POOL_SIZE ? parseInt(process.env.DB_POOL_SIZE) : 10
+      poolSize: process.env.DB_POOL_SIZE ? parseInt(process.env.DB_POOL_SIZE) : 10,
+      supabaseUrl: process.env.SUPABASE_URL,
+      supabaseKey: process.env.SUPABASE_ANON_KEY
     };
   }
 

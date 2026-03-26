@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+
 import { reviewContent } from '@/lib/ai/ai-orchestrator';
 
 type ReviewRequestBody = {
@@ -6,41 +6,55 @@ type ReviewRequestBody = {
   modelId?: number;
 };
 
+export const maxDuration = 60;
+export const runtime = 'edge';
+
 export async function POST(request: Request) {
   let body: ReviewRequestBody;
 
   try {
     body = (await request.json()) as ReviewRequestBody;
   } catch {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: '请求体不是合法 JSON。'
-      },
-      { status: 400 }
-    );
+    return new Response(JSON.stringify({
+      ok: false,
+      error: '请求体不是合法 JSON。'
+    }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 
   if (!body.content) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: '缺少 content。'
-      },
-      { status: 400 }
-    );
+    return new Response(JSON.stringify({
+      ok: false,
+      error: '缺少 content。'
+    }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 
   try {
     const result = await reviewContent(body.content, body.modelId);
 
-    return NextResponse.json({
-      ok: true,
-      content: result.content,
-      usage: result.usage,
-      model: result.model,
-      fallback: result.fallback,
-      originalProvider: result.originalProvider
+    // 使用 Vercel AI SDK 生成流式响应
+    const stream = new ReadableStream({
+      async start(controller) {
+        // 逐字发送内容，模拟打字机效果
+        for (let i = 0; i < result.content.length; i++) {
+          controller.enqueue(new TextEncoder().encode(result.content[i]));
+          await new Promise(resolve => setTimeout(resolve, 10));
+        }
+        controller.close();
+      }
+    });
+
+    return new Response(stream, {
+      headers: {
+        'Content-Type': 'text/plain',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive'
+      }
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : '模型调用失败。';
@@ -69,11 +83,22 @@ export async function POST(request: Request) {
 【结构优化建议】
 建议按照"问题提出 - 理论分析 - 实证研究 - 结论与建议"的逻辑框架进行优化。`;
 
-    return NextResponse.json({
-      ok: true,
-      content: defaultContent,
-      error: message,
-      fallback: true
+    const stream = new ReadableStream({
+      async start(controller) {
+        for (let i = 0; i < defaultContent.length; i++) {
+          controller.enqueue(new TextEncoder().encode(defaultContent[i]));
+          await new Promise(resolve => setTimeout(resolve, 10));
+        }
+        controller.close();
+      }
+    });
+
+    return new Response(stream, {
+      headers: {
+        'Content-Type': 'text/plain',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive'
+      }
     });
   }
 }

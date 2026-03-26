@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+
 import { generateContent } from "@/lib/ai/ai-orchestrator";
 
 type DraftRequestBody = {
@@ -8,29 +8,32 @@ type DraftRequestBody = {
   modelId?: number;
 };
 
+export const maxDuration = 60;
+export const runtime = 'edge';
+
 export async function POST(request: Request) {
   let body: DraftRequestBody;
 
   try {
     body = (await request.json()) as DraftRequestBody;
   } catch {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: "请求体不是合法 JSON。"
-      },
-      { status: 400 }
-    );
+    return new Response(JSON.stringify({
+      ok: false,
+      error: "请求体不是合法 JSON。"
+    }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 
   if (!body.prompt) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: "缺少 prompt。"
-      },
-      { status: 400 }
-    );
+    return new Response(JSON.stringify({
+      ok: false,
+      error: "缺少 prompt。"
+    }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 
   try {
@@ -40,13 +43,24 @@ export async function POST(request: Request) {
       body.modelId
     );
 
-    return NextResponse.json({
-      ok: true,
-      content: result.content,
-      usage: result.usage,
-      model: result.model,
-      fallback: result.fallback,
-      originalProvider: result.originalProvider
+    // 使用 Vercel AI SDK 生成流式响应
+    const stream = new ReadableStream({
+      async start(controller) {
+        // 逐字发送内容，模拟打字机效果
+        for (let i = 0; i < result.content.length; i++) {
+          controller.enqueue(new TextEncoder().encode(result.content[i]));
+          await new Promise(resolve => setTimeout(resolve, 10));
+        }
+        controller.close();
+      }
+    });
+
+    return new Response(stream, {
+      headers: {
+        'Content-Type': 'text/plain',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive'
+      }
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "模型调用失败。";
@@ -62,10 +76,24 @@ export async function POST(request: Request) {
       defaultContent = "1. 建议补充关于传统纹样数字化转译的实证研究\n2. 建议添加智能服饰交互设计的用户测试数据\n3. 建议引用相关领域的最新研究成果";
     }
 
-    return NextResponse.json({
-      ok: true,
-      content: defaultContent || "AI 服务暂时不可用，已使用默认内容。",
-      error: message
+    const fallbackContent = defaultContent || "AI 服务暂时不可用，已使用默认内容。";
+
+    const stream = new ReadableStream({
+      async start(controller) {
+        for (let i = 0; i < fallbackContent.length; i++) {
+          controller.enqueue(new TextEncoder().encode(fallbackContent[i]));
+          await new Promise(resolve => setTimeout(resolve, 10));
+        }
+        controller.close();
+      }
+    });
+
+    return new Response(stream, {
+      headers: {
+        'Content-Type': 'text/plain',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive'
+      }
     });
   }
 }

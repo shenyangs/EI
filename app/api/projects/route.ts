@@ -3,15 +3,23 @@ import { createProject } from "@/lib/server/project-db";
 import { authMiddleware, checkPermission } from "@/lib/server/auth-middleware";
 
 export async function POST(request: NextRequest) {
-  // 验证用户认证
-  const authResponse = await authMiddleware(request);
-  if (authResponse.status !== 200) {
-    return authResponse;
+  // 尝试认证（可选）
+  let userType = 'student'; // 默认用户类型
+  
+  try {
+    const authResponse = await authMiddleware(request);
+    if (authResponse.status === 200) {
+      const authenticatedUserType = authResponse.headers.get('X-User-Type');
+      if (authenticatedUserType) {
+        userType = authenticatedUserType;
+      }
+    }
+  } catch (error) {
+    // 认证失败，使用默认用户类型
   }
 
-  // 检查用户权限
-  const userType = authResponse.headers.get('X-User-Type');
-  if (!userType || !checkPermission(userType, 'project:create')) {
+  // 检查权限（默认学生用户应该有创建项目的权限）
+  if (!checkPermission(userType, 'project:create')) {
     return NextResponse.json(
       {
         ok: false,

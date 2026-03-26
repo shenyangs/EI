@@ -211,8 +211,8 @@ export default function NewProjectPage() {
 
       const data = await response.json();
 
-      if (data.ok && data.projectId) {
-        window.location.href = `/projects/${data.projectId}/outline`;
+      if (data.ok && data.project && data.project.id) {
+        window.location.href = `/projects/${data.project.id}/outline`;
       } else {
         throw new Error("创建项目失败");
       }
