@@ -1,4 +1,7 @@
+import { cookies } from "next/headers";
+
 import { demoProject, getProjectById, type DemoProject } from "@/lib/demo-data";
+import { getSessionProjectById } from "@/lib/project-session";
 import { getProject } from "@/lib/server/project-db";
 import { getVenueProfileById } from "@/lib/venue-profiles";
 
@@ -75,9 +78,15 @@ export async function getProjectViewById(projectId: string): Promise<DemoProject
   }
 
   const storedProject = await getProject(projectId);
-  if (!storedProject) {
+  if (storedProject) {
+    return buildProjectFromDatabase(storedProject);
+  }
+
+  const cookieStore = await cookies();
+  const sessionProject = getSessionProjectById(cookieStore, projectId);
+  if (!sessionProject) {
     return null;
   }
 
-  return buildProjectFromDatabase(storedProject);
+  return buildProjectFromDatabase(sessionProject);
 }

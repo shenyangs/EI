@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createProject } from "@/lib/server/project-db";
+import { buildProjectCardItem, persistSessionProject, readSessionProjects } from "@/lib/project-session";
 import { authMiddleware, checkPermission } from "@/lib/server/auth-middleware";
 
 export async function POST(request: NextRequest) {
@@ -72,10 +73,13 @@ export async function POST(request: NextRequest) {
       throw new Error("项目已写入，但未能返回项目信息。");
     }
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       ok: true,
       project
     });
+    persistSessionProject(response.cookies, project);
+
+    return response;
   } catch (error) {
     const message = error instanceof Error ? error.message : "创建项目失败。";
 
@@ -93,7 +97,12 @@ export async function GET(request: NextRequest) {
   // 验证用户认证
   const authResponse = await authMiddleware(request);
   if (authResponse.status !== 200) {
-    return authResponse;
+    const sessionProjects = readSessionProjects(request.cookies);
+
+    return NextResponse.json({
+      ok: true,
+      projects: sessionProjects.map(buildProjectCardItem)
+    });
   }
 
   // 检查用户权限
@@ -111,10 +120,12 @@ export async function GET(request: NextRequest) {
   try {
     const { getProjects } = await import("@/lib/server/project-db");
     const projects = await getProjects();
+    const sessionProjects = readSessionProjects(request.cookies);
+    const mergedProjects = [...projects, ...sessionProjects.filter((sessionProject) => !projects.some((project) => project.id === sessionProject.id))];
 
     return NextResponse.json({
       ok: true,
-      projects
+      projects: mergedProjects.map(buildProjectCardItem)
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "获取项目列表失败。";
