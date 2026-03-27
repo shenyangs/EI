@@ -89,15 +89,38 @@ export function securityHeadersMiddleware(request: NextRequest) {
   return applySecurityHeaders(NextResponse.next());
 }
 
+function isPrivateNetworkHost(hostname: string) {
+  if (hostname === 'localhost' || hostname === '::1' || hostname.endsWith('.local')) {
+    return true;
+  }
+
+  if (/^127\.\d+\.\d+\.\d+$/.test(hostname)) {
+    return true;
+  }
+
+  if (/^10\.\d+\.\d+\.\d+$/.test(hostname)) {
+    return true;
+  }
+
+  if (/^192\.168\.\d+\.\d+$/.test(hostname)) {
+    return true;
+  }
+
+  const private172Match = hostname.match(/^172\.(\d+)\.\d+\.\d+$/);
+  if (private172Match) {
+    const secondOctet = Number(private172Match[1]);
+    return secondOctet >= 16 && secondOctet <= 31;
+  }
+
+  return false;
+}
+
 // HTTPS重定向中间件 - 增强版
 export function httpsRedirectMiddleware(request: NextRequest) {
   const proto = request.headers.get('x-forwarded-proto');
   const host = request.headers.get('host');
   const hostname = request.nextUrl.hostname;
-  const isLocalhost =
-    hostname === 'localhost' ||
-    hostname === '127.0.0.1' ||
-    hostname === '::1';
+  const isLocalhost = isPrivateNetworkHost(hostname);
   
   // 检查是否需要HTTPS重定向
   if (process.env.NODE_ENV === 'production' && proto !== 'https' && !isLocalhost) {

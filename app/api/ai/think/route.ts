@@ -24,6 +24,19 @@ type ThinkRequest = {
   };
 };
 
+function clampPromptValue(value: string | undefined, maxLength = 280) {
+  if (!value) {
+    return "";
+  }
+
+  const trimmed = value.replace(/\s+/g, " ").trim();
+  if (trimmed.length <= maxLength) {
+    return trimmed;
+  }
+
+  return `${trimmed.slice(0, maxLength)}……`;
+}
+
 function normalizeThinkResult(result: any) {
   if (Array.isArray(result)) {
     return {
@@ -194,7 +207,11 @@ export async function POST(request: Request) {
 // 填充字段 - 为特定字段生成内容
 async function fillField(body: ThinkRequest) {
   const { field, currentValue, userInputs } = body.context;
-  const { title, subject, keywords, description } = userInputs || {};
+  const title = clampPromptValue(userInputs?.title, 120);
+  const subject = clampPromptValue(userInputs?.subject, 120);
+  const keywords = clampPromptValue(userInputs?.keywords, 160);
+  const description = clampPromptValue(userInputs?.description, 360);
+  const currentText = clampPromptValue(currentValue, field === "description" ? 360 : 160);
   
   if (!field) {
     return {
@@ -224,7 +241,7 @@ async function fillField(body: ThinkRequest) {
       if (title && title.trim()) prompt += `【当前标题】${title}\n`;
       if (subject && subject.trim()) prompt += `【研究对象】${subject}\n`;
       if (keywords && keywords.trim()) prompt += `【关键词】${keywords}\n`;
-      if (description && description.trim()) prompt += `【研究描述】${description}\n`;
+      if (description) prompt += `【研究描述】${description}\n`;
       break;
       
     case 'subject':
@@ -245,7 +262,7 @@ async function fillField(body: ThinkRequest) {
       if (title && title.trim()) prompt += `【研究标题】${title}\n`;
       if (subject && subject.trim()) prompt += `【当前研究对象】${subject}\n`;
       if (keywords && keywords.trim()) prompt += `【关键词】${keywords}\n`;
-      if (description && description.trim()) prompt += `【研究描述】${description}\n`;
+      if (description) prompt += `【研究描述】${description}\n`;
       break;
       
     case 'keywords':
@@ -266,7 +283,7 @@ async function fillField(body: ThinkRequest) {
       if (title && title.trim()) prompt += `【研究标题】${title}\n`;
       if (subject && subject.trim()) prompt += `【研究对象】${subject}\n`;
       if (keywords && keywords.trim()) prompt += `【当前关键词】${keywords}\n`;
-      if (description && description.trim()) prompt += `【研究描述】${description}\n`;
+      if (description) prompt += `【研究描述】${description}\n`;
       break;
       
     case 'description':
@@ -287,7 +304,8 @@ async function fillField(body: ThinkRequest) {
       if (title && title.trim()) prompt += `【研究标题】${title}\n`;
       if (subject && subject.trim()) prompt += `【研究对象】${subject}\n`;
       if (keywords && keywords.trim()) prompt += `【关键词】${keywords}\n`;
-      if (description && description.trim()) prompt += `【当前描述】${description}\n`;
+      if (currentText) prompt += `【当前描述】${currentText}\n`;
+      if (description && description !== currentText) prompt += `【研究补充信息】${description}\n`;
       break;
       
     default:
@@ -396,8 +414,10 @@ function getDefaultFieldContent(field: string, title: string): string {
 
 // 生成主题分析 - 基于用户输入的详细信息
 async function generateTopicAnalysis(body: ThinkRequest) {
-  const { projectTitle, userInputs } = body.context;
-  const { subject, keywords, description } = userInputs || {};
+  const projectTitle = clampPromptValue(body.context.projectTitle, 120);
+  const subject = clampPromptValue(body.context.userInputs?.subject, 120);
+  const keywords = clampPromptValue(body.context.userInputs?.keywords, 160);
+  const description = clampPromptValue(body.context.userInputs?.description, 360);
   
   // 构建详细的prompt
   let prompt = `请为以下研究主题生成5个具体、个性化的研究方向：
@@ -472,8 +492,8 @@ async function generateTopicAnalysis(body: ThinkRequest) {
 
 // 生成大纲
 async function generateOutline(body: ThinkRequest) {
-  const { projectTitle, userInputs } = body.context;
-  const { selectedDirection } = userInputs || {};
+  const projectTitle = clampPromptValue(body.context.projectTitle, 120);
+  const selectedDirection = body.context.userInputs?.selectedDirection;
   
   let prompt = `请为以下研究项目生成详细的博士开题级别大纲：
 
@@ -538,8 +558,10 @@ async function generateOutline(body: ThinkRequest) {
 
 // 生成项目分析
 async function generateProjectAnalysis(body: ThinkRequest) {
-  const { projectTitle, userInputs } = body.context;
-  const { subject, keywords, description } = userInputs || {};
+  const projectTitle = clampPromptValue(body.context.projectTitle, 120);
+  const subject = clampPromptValue(body.context.userInputs?.subject, 120);
+  const keywords = clampPromptValue(body.context.userInputs?.keywords, 160);
+  const description = clampPromptValue(body.context.userInputs?.description, 360);
   
   let prompt = `请对以下研究项目进行全面的可行性分析：
 

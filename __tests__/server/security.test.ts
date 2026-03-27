@@ -127,6 +127,20 @@ describe('Security', () => {
       const response = httpsRedirectMiddleware(request);
       expect(response.status).toBe(200);
     });
+
+    it('should not redirect private network ip in production', () => {
+      (process.env as Record<string, string | undefined>).NODE_ENV = 'production';
+
+      const request = createRequest('http://172.20.10.2:3000/api/projects', {
+        headers: {
+          'x-forwarded-proto': 'http',
+          host: '172.20.10.2:3000'
+        }
+      });
+
+      const response = httpsRedirectMiddleware(request);
+      expect(response.status).toBe(200);
+    });
   });
 
   describe('Rate Limit Middleware', () => {

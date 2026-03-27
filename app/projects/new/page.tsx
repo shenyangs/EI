@@ -25,6 +25,16 @@ type AiAnalysisResult = {
   error?: string;
 };
 
+type AiField = "title" | "subject" | "keywords" | "description";
+
+type ProjectIdeaInput = {
+  title: string;
+  subject: string;
+  keywords: string;
+  description: string;
+  venueId: string;
+};
+
 function getFriendlyAiErrorMessage(error: unknown) {
   const message = error instanceof Error ? error.message : "AI 分析失败";
 
@@ -43,12 +53,137 @@ function getFriendlyAiErrorMessage(error: unknown) {
   return message;
 }
 
+function getFriendlyProjectErrorMessage(error: unknown) {
+  const message = error instanceof Error ? error.message : "创建项目失败";
+
+  if (message.includes("Failed to fetch")) {
+    return "浏览器没有连上创建项目接口。请优先用 localhost 打开页面；如果你是通过局域网地址访问，刷新后再试一次。";
+  }
+
+  return message;
+}
+
 async function parseJsonSafely<T>(response: Response): Promise<T | null> {
   try {
     return (await response.json()) as T;
   } catch {
     return null;
   }
+}
+
+function buildLocalFieldSuggestion(field: AiField, input: ProjectIdeaInput) {
+  const baseTitle = input.title.trim() || input.subject.trim() || "研究主题";
+  const descriptionCore = input.description
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 120);
+
+  switch (field) {
+    case "title":
+      return input.title.trim() || `${baseTitle}的跨学科研究`;
+    case "subject":
+      if (input.subject.trim()) {
+        return input.subject.trim();
+      }
+      return descriptionCore ? `${descriptionCore.slice(0, 18)}相关对象` : `${baseTitle}相关对象`;
+    case "keywords": {
+      const parts = [
+        input.title,
+        input.subject,
+        input.keywords,
+        input.description
+      ]
+        .join(" ")
+        .split(/[\s,，。；;、]+/)
+        .map((item) => item.trim())
+        .filter((item) => item.length >= 2);
+
+      const unique = Array.from(new Set(parts)).slice(0, 5);
+      return unique.length > 0 ? unique.join(", ") : `${baseTitle}, 跨学科研究, 创新设计`;
+    }
+    case "description":
+      if (input.description.trim()) {
+        return input.description.trim();
+      }
+      return `本研究围绕“${baseTitle}”展开，重点梳理研究背景、核心问题与预期目标，并结合${input.subject.trim() || "相关研究对象"}设计可执行的研究路径，形成兼顾理论价值与实践应用的研究方案。`;
+  }
+}
+
+function buildLocalAnalysis(input: ProjectIdeaInput): AiAnalysisResult {
+  const topic = input.title.trim() || input.subject.trim() || "当前研究主题";
+  const keywordText = input.keywords.trim() || "跨学科、应用场景、方法路径";
+  const subjectText = input.subject.trim() || "相关研究对象";
+
+  return {
+    ok: true,
+    content: {
+      content: `系统先基于你当前输入给出一版基础判断：你的想法核心围绕“${topic}”，可以先从研究对象、方法路径和应用场景三个层面收紧问题定义，再决定后续大纲方向。`,
+      metadata: {
+        analysis: `当前主题可继续细化为更明确的研究问题与研究边界。`,
+        directions: [
+          {
+            id: "fallback-direction-1",
+            label: `${topic}的问题界定`,
+            description: `先把“${subjectText}”的核心问题、研究边界和评价标准定义清楚，避免后面写作发散。`,
+            confidence: 88
+          },
+          {
+            id: "fallback-direction-2",
+            label: `${topic}的方法设计`,
+            description: `围绕“${keywordText}”设计研究方法、样本或案例路径，让你的想法更容易落成完整论文。`,
+            confidence: 84
+          },
+          {
+            id: "fallback-direction-3",
+            label: `${topic}的应用验证`,
+            description: `把主题放进具体使用场景或实践对象里，优先验证它的实际价值与可行性。`,
+            confidence: 82
+          }
+        ]
+      }
+    }
+  };
+}
+
+async function requestAiJson<T>(payload: unknown, timeoutMs = 15000, retries = 1): Promise<T> {
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      const response = await fetch("/api/ai/think", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload),
+        signal: controller.signal
+      });
+      const data = await parseJsonSafely<T & { error?: string }>(response);
+
+      if (!response.ok) {
+        throw new Error(data?.error || `AI 请求失败（${response.status}）`);
+      }
+
+      if (!data) {
+        throw new Error("AI 返回了空结果");
+      }
+
+      return data;
+    } catch (error) {
+      lastError = error;
+
+      if (attempt === retries) {
+        break;
+      }
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error("AI 请求失败");
 }
 
 type CreateProjectResponse = {
@@ -70,8 +205,10 @@ export default function NewProjectPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [aiAnalysis, setAiAnalysis] = useState<AiAnalysisResult | null>(null);
   const analysisRef = useRef<HTMLDivElement | null>(null);
+  const aiLockRef = useRef<Record<string, boolean>>({});
 
   useEffect(() => {
     if (!aiAnalysis) {
@@ -87,38 +224,34 @@ export default function NewProjectPage() {
   async function analyzeWithAi() {
     setIsAnalyzing(true);
     setError("");
+    setNotice("");
+
+    const currentInput: ProjectIdeaInput = {
+      title,
+      subject,
+      keywords,
+      description,
+      venueId
+    };
 
     try {
-      const requestOptions: RequestInit = {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          taskType: "project_initialization",
-          context: {
-            projectId: "new",
-            projectTitle: title,
-            venueId: venueId,
-            currentStep: "project_creation",
-            previousSteps: [],
-            userInputs: {
-              title,
-              subject,
-              keywords,
-              description,
-              venueId
-            }
+      const data = await requestAiJson<AiAnalysisResult>({
+        taskType: "project_initialization",
+        context: {
+          projectId: "new",
+          projectTitle: title,
+          venueId: venueId,
+          currentStep: "project_creation",
+          previousSteps: [],
+          userInputs: {
+            title,
+            subject,
+            keywords,
+            description,
+            venueId
           }
-        })
-      };
-
-      const response = await fetch("/api/ai/think", requestOptions);
-      const data = await parseJsonSafely<AiAnalysisResult>(response);
-
-      if (!response.ok) {
-        throw new Error(data?.error || `AI 分析请求失败（${response.status}）`);
-      }
+        }
+      });
 
       if (!data?.ok) {
         throw new Error(data?.error || "AI 分析失败");
@@ -126,49 +259,52 @@ export default function NewProjectPage() {
 
       setAiAnalysis(data);
     } catch (err) {
-      setAiAnalysis(null);
+      setAiAnalysis(buildLocalAnalysis(currentInput));
+      setNotice("AI 当前不稳定，先给你一版基础分析建议，你可以直接继续往下填。");
       setError(getFriendlyAiErrorMessage(err));
     } finally {
       setIsAnalyzing(false);
     }
   }
 
-  async function fillWithAi(field: string, currentValue: string) {
+  async function fillWithAi(field: AiField, currentValue: string) {
+    if (aiLockRef.current[field]) {
+      return;
+    }
+
+    aiLockRef.current[field] = true;
     setAiFilling(prev => ({ ...prev, [field]: true }));
     setError("");
+    setNotice("");
+
+    const currentInput: ProjectIdeaInput = {
+      title,
+      subject,
+      keywords,
+      description,
+      venueId
+    };
 
     try {
-      const response = await fetch("/api/ai/think", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          taskType: "fill_field",
-          context: {
-            field,
-            currentValue,
-            projectId: "new",
-            projectTitle: title,
-            venueId: venueId,
-            currentStep: "project_creation",
-            previousSteps: [],
-            userInputs: {
-              title,
-              subject,
-              keywords,
-              description,
-              venueId
-            }
+      const data = await requestAiJson<AiAnalysisResult>({
+        taskType: "fill_field",
+        context: {
+          field,
+          currentValue,
+          projectId: "new",
+          projectTitle: title,
+          venueId: venueId,
+          currentStep: "project_creation",
+          previousSteps: [],
+          userInputs: {
+            title,
+            subject,
+            keywords,
+            description,
+            venueId
           }
-        })
-      });
-
-      const data = await parseJsonSafely<AiAnalysisResult>(response);
-
-      if (!response.ok) {
-        throw new Error(data?.error || `AI 填充请求失败（${response.status}）`);
-      }
+        }
+      }, 12000, 1);
 
       if (!data?.ok) {
         throw new Error(data?.error || "AI 填充失败");
@@ -189,8 +325,27 @@ export default function NewProjectPage() {
           break;
       }
     } catch (err) {
+      const fallbackContent = buildLocalFieldSuggestion(field, currentInput);
+
+      switch (field) {
+        case "title":
+          setTitle(fallbackContent);
+          break;
+        case "subject":
+          setSubject(fallbackContent);
+          break;
+        case "keywords":
+          setKeywords(fallbackContent);
+          break;
+        case "description":
+          setDescription(fallbackContent);
+          break;
+      }
+
+      setNotice("AI 当前不稳定，系统先帮你填了一版基础内容，你可以在此基础上继续改。");
       setError(getFriendlyAiErrorMessage(err));
     } finally {
+      aiLockRef.current[field] = false;
       setAiFilling(prev => ({ ...prev, [field]: false }));
     }
   }
@@ -256,7 +411,7 @@ export default function NewProjectPage() {
         throw new Error(data?.error || "项目创建接口没有返回有效的项目编号。");
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "创建项目失败");
+      setError(getFriendlyProjectErrorMessage(err));
     } finally {
       setIsSubmitting(false);
     }
@@ -435,6 +590,12 @@ export default function NewProjectPage() {
               </div>
             )}
 
+            {notice && (
+              <div className="form-notice">
+                <p>{notice}</p>
+              </div>
+            )}
+
             <div className="form-actions">
               <button
                 type="submit"
@@ -503,6 +664,19 @@ export default function NewProjectPage() {
           gap: 12px;
           justify-content: flex-end;
           margin-top: 24px;
+        }
+
+        .form-notice {
+          grid-column: 1 / -1;
+          padding: 14px 16px;
+          border-radius: 16px;
+          background: rgba(238, 247, 255, 0.92);
+          border: 1px solid rgba(163, 200, 255, 0.55);
+          color: #35537e;
+        }
+
+        .form-notice p {
+          margin: 0;
         }
 
         .direction-list {
