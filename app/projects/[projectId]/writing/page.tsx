@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 
 import { ChapterWritingStudio } from "@/components/chapter-writing-studio";
 import { StatusBadge } from "@/components/status-badge";
-import { getProjectById } from "@/lib/demo-data";
+import { getProjectViewById } from "@/lib/project-view";
 import { getVenueProfileById } from "@/lib/venue-profiles";
 
 export default async function WritingPage({
@@ -14,7 +14,7 @@ export default async function WritingPage({
 }) {
   const { projectId } = await params;
   const { chapter, venue } = await searchParams;
-  const project = getProjectById(projectId);
+  const project = await getProjectViewById(projectId);
   const venueProfile = getVenueProfileById(venue);
 
   if (!project) {

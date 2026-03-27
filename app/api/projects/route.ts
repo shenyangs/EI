@@ -68,6 +68,10 @@ export async function POST(request: NextRequest) {
       venueId: body.venueId
     });
 
+    if (!project?.id) {
+      throw new Error("项目已写入，但未能返回项目信息。");
+    }
+
     return NextResponse.json({
       ok: true,
       project

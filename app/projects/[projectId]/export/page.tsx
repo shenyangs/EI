@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { ExportPanel } from "@/components/export-panel";
 import { FullTextPreview } from "@/components/fulltext-preview";
 import { StatusBadge } from "@/components/status-badge";
-import { getProjectById } from "@/lib/demo-data";
+import { getProjectViewById } from "@/lib/project-view";
 import {
   getPriorityReviewAction,
   getReviewAction,
@@ -21,7 +21,7 @@ export default async function ExportPage({
 }) {
   const { projectId } = await params;
   const { venue } = await searchParams;
-  const project = getProjectById(projectId);
+  const project = await getProjectViewById(projectId);
   const venueProfile = getVenueProfileById(venue);
 
   if (!project) {

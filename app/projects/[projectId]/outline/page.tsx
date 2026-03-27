@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { OutlineWorkbench } from "@/components/outline-workbench";
-import { getProjectById } from "@/lib/demo-data";
+import { getProjectViewById } from "@/lib/project-view";
 
 export default async function OutlinePage({
   params,
@@ -12,7 +12,7 @@ export default async function OutlinePage({
 }) {
   const { projectId } = await params;
   const { venue, title, direction, directionId } = await searchParams;
-  const project = getProjectById(projectId);
+  const project = await getProjectViewById(projectId);
 
   if (!project) {
     notFound();

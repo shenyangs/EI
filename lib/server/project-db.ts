@@ -16,13 +16,24 @@ export async function createProject(project: Omit<Project, 'id' | 'createdAt' | 
   const db = await getDatabase();
   const id = project.id || `project-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   const now = Date.now();
+  const createdProject: Project = {
+    id,
+    title: project.title,
+    subject: project.subject,
+    keywords: project.keywords,
+    description: project.description,
+    createdAt: now,
+    updatedAt: now,
+    venueId: project.venueId
+  };
 
   await db.run(
     'INSERT INTO projects (id, title, subject, keywords, description, createdAt, updatedAt, venueId) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
     [id, project.title, project.subject, project.keywords, project.description, now, now, project.venueId]
   );
 
-  return await getProject(id);
+  const savedProject = await getProject(id);
+  return savedProject ?? createdProject;
 }
 
 export async function getProject(id: string) {

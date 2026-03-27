@@ -93,9 +93,14 @@ export function securityHeadersMiddleware(request: NextRequest) {
 export function httpsRedirectMiddleware(request: NextRequest) {
   const proto = request.headers.get('x-forwarded-proto');
   const host = request.headers.get('host');
+  const hostname = request.nextUrl.hostname;
+  const isLocalhost =
+    hostname === 'localhost' ||
+    hostname === '127.0.0.1' ||
+    hostname === '::1';
   
   // 检查是否需要HTTPS重定向
-  if (process.env.NODE_ENV === 'production' && proto !== 'https') {
+  if (process.env.NODE_ENV === 'production' && proto !== 'https' && !isLocalhost) {
     // 检查是否是健康检查端点（允许HTTP）
     if (request.nextUrl.pathname === '/api/monitoring/health') {
       return NextResponse.next();

@@ -6,7 +6,7 @@ import { ProjectNav } from "@/components/project-nav";
 import { StatusBadge } from "@/components/status-badge";
 import { VenueHeaderInfo } from "@/components/venue-header-info";
 import { getAiCapabilitySnapshot } from "@/lib/ai-runtime";
-import { getProjectById } from "@/lib/demo-data";
+import { getProjectViewById } from "@/lib/project-view";
 
 export default async function ProjectLayout({
   children,
@@ -16,7 +16,7 @@ export default async function ProjectLayout({
   params: Promise<{ projectId: string }>;
 }) {
   const { projectId } = await params;
-  const project = getProjectById(projectId);
+  const project = await getProjectViewById(projectId);
   const ai = getAiCapabilitySnapshot();
 
   if (!project) {

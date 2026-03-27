@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { TopicDirectionSelector } from "@/components/topic-direction-selector";
-import { getProjectById } from "@/lib/demo-data";
+import { getProjectViewById } from "@/lib/project-view";
 
 export default async function ProfilePage({
   params,
@@ -12,7 +12,7 @@ export default async function ProfilePage({
 }) {
   const { projectId } = await params;
   const { venue, title } = await searchParams;
-  const project = getProjectById(projectId);
+  const project = await getProjectViewById(projectId);
 
   if (!project) {
     notFound();

@@ -113,6 +113,20 @@ describe('Security', () => {
       const response = httpsRedirectMiddleware(request);
       expect(response.status).toBe(200);
     });
+
+    it('should not redirect localhost in production', () => {
+      (process.env as Record<string, string | undefined>).NODE_ENV = 'production';
+
+      const request = createRequest('http://localhost:3000/api/projects', {
+        headers: {
+          'x-forwarded-proto': 'http',
+          host: 'localhost:3000'
+        }
+      });
+
+      const response = httpsRedirectMiddleware(request);
+      expect(response.status).toBe(200);
+    });
   });
 
   describe('Rate Limit Middleware', () => {

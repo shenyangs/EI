@@ -4,6 +4,7 @@ import { isCertificateChainError, requestTextWithCurl } from '@/lib/curl-transpo
 // 缓存配置
 const CACHE_DURATION = 5 * 60 * 1000; // 5分钟
 const MAX_CACHE_SIZE = 100; // 最大缓存条目数
+const MODEL_REQUEST_TIMEOUT_MS = 18000;
 
 // 缓存对象
 const cache = new Map<string, { data: any; timestamp: number }>();
@@ -120,19 +121,37 @@ function buildModelRequest(model: AIModel, body: Record<string, unknown>) {
   };
 }
 
+function createTimeoutController(timeoutMs: number) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  return {
+    signal: controller.signal,
+    clear: () => clearTimeout(timeoutId)
+  };
+}
+
 async function requestModel(
   model: AIModel,
   body: Record<string, unknown>
 ) {
   try {
     const { endpoint, headers, requestBody } = buildModelRequest(model, body);
+    const timeout = createTimeoutController(MODEL_REQUEST_TIMEOUT_MS);
 
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(requestBody),
-      cache: 'no-store'
-    });
+    let response: Response;
+
+    try {
+      response = await fetch(endpoint, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(requestBody),
+        cache: 'no-store',
+        signal: timeout.signal
+      });
+    } finally {
+      timeout.clear();
+    }
 
     const text = await response.text();
 
@@ -167,6 +186,10 @@ async function requestModel(
 
     return data as OpenAiCompatibleResponse;
   } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('AI 服务响应超时，请稍后重试');
+    }
+
     if (!isCertificateChainError(error)) {
       throw error;
     }
@@ -178,7 +201,7 @@ async function requestModel(
       method: 'POST',
       headers,
       body: JSON.stringify(requestBody),
-      timeoutSeconds: 30
+      timeoutSeconds: Math.ceil(MODEL_REQUEST_TIMEOUT_MS / 1000)
     });
 
     if (status < 200 || status >= 300) {

@@ -82,6 +82,38 @@ describe('AI routes', () => {
     expect(data.content.sections.title).toBe('智能服饰交互设计研究');
   });
 
+  it('think route should fall back gracefully for project initialization analysis', async () => {
+    mockOrchestrateAIRequest.mockRejectedValue(new Error('AI 服务响应超时，请稍后重试'));
+
+    const response = await thinkPost(
+      new Request('http://localhost/api/ai/think', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          taskType: 'project_initialization',
+          context: {
+            projectId: 'new',
+            projectTitle: '智能服饰交互设计',
+            venueId: 'ieee-iccci-2026',
+            currentStep: 'project_creation',
+            previousSteps: [],
+            userInputs: {
+              title: '智能服饰交互设计',
+              description: '希望研究服装与交互技术的结合方式'
+            }
+          }
+        })
+      })
+    );
+
+    const data = await response.json();
+    expect(response.status).toBe(200);
+    expect(data.ok).toBe(true);
+    expect(data.content.content).toContain('智能服饰交互设计');
+    expect(Array.isArray(data.content.metadata.directions)).toBe(true);
+    expect(data.content.metadata.directions.length).toBeGreaterThan(0);
+  });
+
   it('stream route should support revision suggestion events', async () => {
     mockGenerateRevisionSuggestions.mockResolvedValue([
       {

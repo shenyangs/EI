@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 
 import { StatusBadge } from "@/components/status-badge";
 import { VenueProfileSummary } from "@/components/venue-profile-summary";
-import { getProjectById } from "@/lib/demo-data";
+import { getProjectViewById } from "@/lib/project-view";
 import { buildVenueHref, getVenueProfileById } from "@/lib/venue-profiles";
 
 export default async function ProjectOverviewPage({
@@ -15,7 +15,7 @@ export default async function ProjectOverviewPage({
 }) {
   const { projectId } = await params;
   const { venue } = await searchParams;
-  const project = getProjectById(projectId);
+  const project = await getProjectViewById(projectId);
   const venueProfile = getVenueProfileById(venue);
 
   if (!project) {

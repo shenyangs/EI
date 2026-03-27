@@ -61,36 +61,6 @@ interface OrchestratorResult {
   };
 }
 
-// 模型可用性缓存
-const modelAvailabilityCache = new Map<string, { available: boolean; lastChecked: number }>();
-const CACHE_DURATION = 60000; // 1分钟
-
-async function isModelAvailable(model: AIModel): Promise<boolean> {
-  const cacheKey = `model_${model.id}`;
-  const cached = modelAvailabilityCache.get(cacheKey);
-  const now = Date.now();
-
-  if (cached && now - cached.lastChecked < CACHE_DURATION) {
-    return cached.available;
-  }
-
-  try {
-    const { probeModelConnection } = await import('@/lib/ai/ai-client');
-    const available = await probeModelConnection(model);
-    modelAvailabilityCache.set(cacheKey, { available, lastChecked: now });
-    return available;
-  } catch (error) {
-    console.error(`Failed to check model ${model.id} availability:`, error);
-    modelAvailabilityCache.set(cacheKey, { available: false, lastChecked: now });
-    return false;
-  }
-}
-
-function invalidateModelCache(modelId: number) {
-  const cacheKey = `model_${modelId}`;
-  modelAvailabilityCache.delete(cacheKey);
-}
-
 async function getModuleConfig(taskType: TaskType): Promise<AiModuleConfig | null> {
   try {
     const moduleKey = TASK_TYPE_TO_MODULE_KEY[taskType];
@@ -248,43 +218,10 @@ export async function orchestrateAIRequest(options: OrchestratorOptions): Promis
 
   const originalProvider = primaryModel.provider;
   let fallbackModel: AIModel | null = null;
-  let usedFallback = false;
 
   // 尝试使用首选模型
   try {
-    // 检查模型可用性
-    const isAvailable = await isModelAvailable(primaryModel);
-    
-    if (!isAvailable && enableFallback) {
-      // 首选模型不可用，尝试备用模型
-      fallbackModel = await getFallbackModelForTask(taskType);
-      
-      if (fallbackModel && await isModelAvailable(fallbackModel)) {
-        const result = await tryGenerateWithModel(
-          fallbackModel,
-          prompt,
-          systemPrompt,
-          temperature
-        );
-        
-        usedFallback = true;
-        invalidateModelCache(primaryModel.id);
-
-        return {
-          content: result.content,
-          usage: result.usage,
-          model: {
-            id: fallbackModel.id,
-            name: fallbackModel.name,
-            provider: fallbackModel.provider
-          },
-          fallback: true,
-          originalProvider
-        };
-      }
-    }
-
-    // 使用首选模型生成
+    // 直接尝试真实生成，避免在用户点击时先做一次额外探活请求。
     const result = await tryGenerateWithModel(
       primaryModel,
       prompt,
@@ -304,7 +241,6 @@ export async function orchestrateAIRequest(options: OrchestratorOptions): Promis
     };
   } catch (error) {
     console.error(`Primary model ${primaryModel.name} failed:`, error);
-    invalidateModelCache(primaryModel.id);
 
     if (!enableFallback) {
       throw error;
@@ -324,8 +260,6 @@ export async function orchestrateAIRequest(options: OrchestratorOptions): Promis
         systemPrompt,
         temperature
       );
-
-      usedFallback = true;
 
       return {
         content: result.content,
