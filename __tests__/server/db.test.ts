@@ -27,6 +27,8 @@ describe('Database', () => {
       const project: Project = {
         id: 'test-project-1',
         title: 'Test Project',
+        subject: 'fashion design',
+        keywords: 'wearable, ei',
         description: 'Test Description',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -34,8 +36,8 @@ describe('Database', () => {
       };
 
       await db.run(
-        'INSERT INTO projects (id, title, description, createdAt, updatedAt, venueId) VALUES (?, ?, ?, ?, ?, ?)',
-        [project.id, project.title, project.description, project.createdAt, project.updatedAt, project.venueId]
+        'INSERT INTO projects (id, title, subject, keywords, description, createdAt, updatedAt, venueId) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        [project.id, project.title, project.subject, project.keywords, project.description, project.createdAt, project.updatedAt, project.venueId]
       );
 
       const retrieved = await db.get('SELECT * FROM projects WHERE id = ?', [project.id]);
@@ -48,6 +50,8 @@ describe('Database', () => {
       const project1 = {
         id: 'project-1',
         title: 'Project 1',
+        subject: 'subject-1',
+        keywords: 'keyword-1',
         description: 'Description 1',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -57,6 +61,8 @@ describe('Database', () => {
       const project2 = {
         id: 'project-2',
         title: 'Project 2',
+        subject: 'subject-2',
+        keywords: 'keyword-2',
         description: 'Description 2',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -64,13 +70,13 @@ describe('Database', () => {
       };
 
       await db.run(
-        'INSERT INTO projects (id, title, description, createdAt, updatedAt, venueId) VALUES (?, ?, ?, ?, ?, ?)',
-        [project1.id, project1.title, project1.description, project1.createdAt, project1.updatedAt, project1.venueId]
+        'INSERT INTO projects (id, title, subject, keywords, description, createdAt, updatedAt, venueId) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        [project1.id, project1.title, project1.subject, project1.keywords, project1.description, project1.createdAt, project1.updatedAt, project1.venueId]
       );
 
       await db.run(
-        'INSERT INTO projects (id, title, description, createdAt, updatedAt, venueId) VALUES (?, ?, ?, ?, ?, ?)',
-        [project2.id, project2.title, project2.description, project2.createdAt, project2.updatedAt, project2.venueId]
+        'INSERT INTO projects (id, title, subject, keywords, description, createdAt, updatedAt, venueId) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        [project2.id, project2.title, project2.subject, project2.keywords, project2.description, project2.createdAt, project2.updatedAt, project2.venueId]
       );
 
       const allProjects = await db.all('SELECT * FROM projects');
@@ -181,6 +187,25 @@ describe('Database', () => {
 
       const retrieved = await db.get('SELECT * FROM ai_models WHERE isDefault = 1');
       expect(retrieved).toMatchObject(defaultModel);
+    });
+
+    it('should filter models by provider', async () => {
+      const db = await getDatabase();
+
+      await db.run(
+        'INSERT INTO ai_models (name, provider, model, baseUrl, apiKey, isDefault, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        ['Minimax', 'minimax', 'MiniMax-M2.7', 'https://api.minimax.test', 'minimax-key', false, new Date().toISOString()]
+      );
+
+      await db.run(
+        'INSERT INTO ai_models (name, provider, model, baseUrl, apiKey, isDefault, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        ['Gemini', 'google', 'gemini-pro', 'https://api.google.test', 'gemini-key', false, new Date().toISOString()]
+      );
+
+      const models = await db.all('SELECT * FROM ai_models WHERE provider = ?', ['google']);
+      expect(models).toHaveLength(1);
+      expect(models[0].provider).toBe('google');
+      expect(models[0].name).toBe('Gemini');
     });
 
     it('should update AI model', async () => {

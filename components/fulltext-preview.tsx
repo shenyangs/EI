@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 
 import { ArchiveActionPanel } from "@/components/archive-action-panel";
 import { QualityReviewPanel } from "@/components/quality-review-panel";
@@ -156,7 +156,7 @@ export function FullTextPreview({
     versions
   } = useProjectVersionHistory<FullTextVersionPayload>(projectId, archiveKey);
 
-  async function runFullTextCheck(content: string) {
+  const runFullTextCheck = useCallback(async (content: string) => {
     setReviewLoading(true);
 
     try {
@@ -199,7 +199,7 @@ export function FullTextPreview({
     } finally {
       setReviewLoading(false);
     }
-  }
+  }, [projectTitle, venueProfile.id]);
 
   useEffect(() => {
     if (review) {
@@ -207,7 +207,7 @@ export function FullTextPreview({
     }
 
     void runFullTextCheck(currentFullText);
-  }, [currentFullText, review]);
+  }, [currentFullText, review, runFullTextCheck]);
 
   function regeneratePreview() {
     startTransition(async () => {

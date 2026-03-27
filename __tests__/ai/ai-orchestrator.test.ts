@@ -1,35 +1,56 @@
-import { orchestrateAIRequest, generateDirection, reviewContent, generateContent } from '@/lib/ai/ai-orchestrator';
+import { generateContent, generateDirection, orchestrateAIRequest, reviewContent } from '@/lib/ai/ai-orchestrator';
 
-// 模拟AI客户端
+const mockGetDefaultModel = jest.fn();
+const mockGetModelById = jest.fn();
+const mockGetModelByProvider = jest.fn();
+const mockGeneratePaperDraft = jest.fn();
+const mockProbeModelConnection = jest.fn();
+
 jest.mock('@/lib/ai/ai-client', () => ({
-  getDefaultModel: jest.fn().mockResolvedValue({
-    id: 1,
-    name: 'Default Model',
-    provider: 'default'
-  }),
-  getModelById: jest.fn().mockResolvedValue(null),
-  generatePaperDraft: jest.fn().mockResolvedValue({
-    content: 'Test content',
-    usage: { tokens: 100 }
-  }),
-  probeModelConnection: jest.fn().mockResolvedValue(true)
+  getDefaultModel: (...args: unknown[]) => mockGetDefaultModel(...args),
+  getModelById: (...args: unknown[]) => mockGetModelById(...args),
+  getModelByProvider: (...args: unknown[]) => mockGetModelByProvider(...args),
+  generatePaperDraft: (...args: unknown[]) => mockGeneratePaperDraft(...args),
+  probeModelConnection: (...args: unknown[]) => mockProbeModelConnection(...args)
 }));
 
-// 模拟数据库
 jest.mock('@/lib/server/db', () => ({
   getDatabase: jest.fn().mockResolvedValue({
+    get: jest.fn().mockResolvedValue(null),
     all: jest.fn().mockResolvedValue([])
   })
 }));
 
 describe('AI Orchestrator', () => {
+  beforeEach(() => {
+    mockGetDefaultModel.mockReset();
+    mockGetModelById.mockReset();
+    mockGetModelByProvider.mockReset();
+    mockGeneratePaperDraft.mockReset();
+    mockProbeModelConnection.mockReset();
+
+    mockGetDefaultModel.mockResolvedValue({
+      id: 1,
+      name: 'Default Model',
+      provider: 'default'
+    });
+    mockGetModelById.mockResolvedValue(null);
+    mockGetModelByProvider.mockResolvedValue(null);
+    mockGeneratePaperDraft.mockResolvedValue({
+      content: 'Test content',
+      usage: { tokens: 100 }
+    });
+    mockProbeModelConnection.mockResolvedValue(true);
+  });
+
   describe('orchestrateAIRequest', () => {
-    it('should orchestrate AI request with default model when no preferred model found', async () => {
+    it('should fall back to default model when provider specific model is unavailable', async () => {
       const result = await orchestrateAIRequest({
         taskType: 'content',
         prompt: 'Test prompt'
       });
 
+      expect(mockGetDefaultModel).toHaveBeenCalled();
       expect(result.content).toBe('Test content');
       expect(result.model.name).toBe('Default Model');
     });

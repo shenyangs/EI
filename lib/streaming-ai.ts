@@ -1,3 +1,5 @@
+import { TextDecoder as NodeTextDecoder } from 'util';
+
 export type StreamChunk = {
   type: 'thinking' | 'content' | 'quality' | 'next_steps' | 'revision' | 'error' | 'complete';
   data: any;
@@ -109,35 +111,71 @@ export async function* streamAiTask(
     throw new Error('No response body');
   }
 
-  const decoder = new TextDecoder();
+  const Decoder = globalThis.TextDecoder || NodeTextDecoder;
+  const decoder = new Decoder();
+  let buffer = '';
+
+  const parseEvent = (rawEvent: string): StreamChunk | null => {
+    const lines = rawEvent
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean);
+
+    for (const line of lines) {
+      if (!line.startsWith('data:')) {
+        continue;
+      }
+
+      const data = line.slice(5).trim();
+      if (!data) {
+        continue;
+      }
+
+      if (data === '[DONE]') {
+        return { type: 'complete', data: null };
+      }
+
+      try {
+        return JSON.parse(data) as StreamChunk;
+      } catch {
+        return { type: 'content', data: { chunk: data } };
+      }
+    }
+
+    return null;
+  };
 
   try {
     while (true) {
       const { done, value } = await reader.read();
-      if (done) break;
+      if (done) {
+        buffer += decoder.decode();
+      } else {
+        buffer += decoder.decode(value, { stream: true });
+      }
 
-      const chunk = decoder.decode(value, { stream: true });
-      const lines = chunk.split('\n');
+      let separatorIndex = buffer.indexOf('\n\n');
+      while (separatorIndex !== -1) {
+        const rawEvent = buffer.slice(0, separatorIndex);
+        buffer = buffer.slice(separatorIndex + 2);
 
-      for (const line of lines) {
-        if (!line.trim()) continue;
-        
-        // 处理 SSE 格式
-        if (line.startsWith('data: ')) {
-          const data = line.slice(6);
-          if (data === '[DONE]') {
-            yield { type: 'complete', data: null };
+        const parsed = parseEvent(rawEvent);
+        if (parsed) {
+          yield parsed;
+          if (parsed.type === 'complete') {
             return;
           }
-          
-          try {
-            const parsed = JSON.parse(data) as StreamChunk;
-            yield parsed;
-          } catch {
-            // 如果不是 JSON，作为内容块处理
-            yield { type: 'content', data: { chunk: data } };
-          }
         }
+
+        separatorIndex = buffer.indexOf('\n\n');
+      }
+
+      if (done) {
+        const trailing = parseEvent(buffer);
+        if (trailing) {
+          yield trailing;
+        }
+        break;
       }
     }
   } finally {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { ReferenceManager, type Reference, type ReferenceFilter } from "@/lib/references";
 
@@ -23,14 +23,14 @@ export function ReferenceManagerPanel({ projectId }: ReferenceManagerProps) {
   const [isImporting, setIsImporting] = useState(false);
   const [message, setMessage] = useState("");
 
-  useEffect(() => {
-    loadReferences();
-  }, [filter]);
-
-  const loadReferences = () => {
+  const loadReferences = useCallback(() => {
     const refs = ReferenceManager.getReferences(filter);
     setReferences(refs);
-  };
+  }, [filter]);
+
+  useEffect(() => {
+    loadReferences();
+  }, [loadReferences]);
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;

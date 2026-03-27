@@ -66,53 +66,66 @@ function stripThinkingBlocks(content: string) {
   return content.replace(/<think>[\s\S]*?<\/think>\s*/gi, '').trim();
 }
 
+function buildModelRequest(model: AIModel, body: Record<string, unknown>) {
+  let endpoint = `${model.baseUrl.replace(/\/$/, '')}/chat/completions`;
+  let headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${model.apiKey}`
+  };
+  let requestBody = body;
+
+  if (model.provider === 'google') {
+    endpoint = `${model.baseUrl.replace(/\/$/, '')}/models/${model.model}:generateContent?key=${encodeURIComponent(model.apiKey)}`;
+    headers = {
+      'Content-Type': 'application/json'
+    };
+
+    const messages = body.messages as Array<{ role?: string; content?: string }> | undefined;
+    let fullText = '';
+
+    if (Array.isArray(messages)) {
+      const systemMessage = messages.find((message) => message.role === 'system');
+      const userMessage = messages.find((message) => message.role === 'user');
+
+      if (systemMessage?.content) {
+        fullText += `${systemMessage.content}\n\n`;
+      }
+
+      if (userMessage?.content) {
+        fullText += userMessage.content;
+      }
+    }
+
+    requestBody = {
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            {
+              text: fullText
+            }
+          ]
+        }
+      ],
+      generationConfig: {
+        temperature: body.temperature || 0.5
+      }
+    };
+  }
+
+  return {
+    endpoint,
+    headers,
+    requestBody
+  };
+}
+
 async function requestModel(
   model: AIModel,
   body: Record<string, unknown>
 ) {
   try {
-    let endpoint = `${model.baseUrl.replace(/\/$/, '')}/chat/completions`;
-    let headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${model.apiKey}`
-    };
-    let requestBody = body;
-
-    // 处理Gemini模型的特殊格式
-    if (model.provider === 'google') {
-      endpoint = `${model.baseUrl.replace(/\/$/, '')}/models/${model.model}:generateContent`;
-      const messages = body.messages as Array<{ role?: string; content?: string }> | undefined;
-      
-      // 组合system prompt和user prompt
-      let fullText = '';
-      if (Array.isArray(messages)) {
-        const systemMessage = messages.find(m => m.role === 'system');
-        const userMessage = messages.find(m => m.role === 'user');
-        
-        if (systemMessage?.content) {
-          fullText += systemMessage.content + '\n\n';
-        }
-        if (userMessage?.content) {
-          fullText += userMessage.content;
-        }
-      }
-      
-      requestBody = {
-        contents: [
-          {
-            role: 'user',
-            parts: [
-              {
-                text: fullText
-              }
-            ]
-          }
-        ],
-        generationConfig: {
-          temperature: body.temperature || 0.5
-        }
-      };
-    }
+    const { endpoint, headers, requestBody } = buildModelRequest(model, body);
 
     const response = await fetch(endpoint, {
       method: 'POST',
@@ -158,48 +171,7 @@ async function requestModel(
       throw error;
     }
 
-    let endpoint = `${model.baseUrl.replace(/\/$/, '')}/chat/completions`;
-    let headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${model.apiKey}`
-    };
-    let requestBody = body;
-
-    // 处理Gemini模型的特殊格式
-    if (model.provider === 'google') {
-      endpoint = `${model.baseUrl.replace(/\/$/, '')}/models/${model.model}:generateContent`;
-      const messages = body.messages as Array<{ role?: string; content?: string }> | undefined;
-      
-      // 组合system prompt和user prompt
-      let fullText = '';
-      if (Array.isArray(messages)) {
-        const systemMessage = messages.find(m => m.role === 'system');
-        const userMessage = messages.find(m => m.role === 'user');
-        
-        if (systemMessage?.content) {
-          fullText += systemMessage.content + '\n\n';
-        }
-        if (userMessage?.content) {
-          fullText += userMessage.content;
-        }
-      }
-      
-      requestBody = {
-        contents: [
-          {
-            role: 'user',
-            parts: [
-              {
-                text: fullText
-              }
-            ]
-          }
-        ],
-        generationConfig: {
-          temperature: body.temperature || 0.5
-        }
-      };
-    }
+    const { endpoint, headers, requestBody } = buildModelRequest(model, body);
 
     const { status, text } = await requestTextWithCurl({
       url: endpoint,

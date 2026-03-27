@@ -1,5 +1,6 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getDatabase } from '@/lib/server/db';
+import { authMiddleware, checkPermission } from '@/lib/server/auth-middleware';
 
 interface AiModuleConfig {
   id?: number;
@@ -22,8 +23,21 @@ const AI_MODULES = [
   { key: 'think', name: 'AI思考', description: '深度思考和任务编排' }
 ];
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const authResponse = await authMiddleware(request);
+    if (authResponse.status !== 200) {
+      return authResponse;
+    }
+
+    const userType = authResponse.headers.get('X-User-Type');
+    if (!userType || !checkPermission(userType, 'ai:read')) {
+      return NextResponse.json(
+        { ok: false, error: '没有权限查看模块配置。' },
+        { status: 403 }
+      );
+    }
+
     const db = await getDatabase();
     const configs = await db.all('SELECT * FROM ai_module_configs');
     const models = await db.all('SELECT * FROM ai_models');
@@ -53,8 +67,21 @@ export async function GET() {
   }
 }
 
-export async function PUT(request: Request) {
+export async function PUT(request: NextRequest) {
   try {
+    const authResponse = await authMiddleware(request);
+    if (authResponse.status !== 200) {
+      return authResponse;
+    }
+
+    const userType = authResponse.headers.get('X-User-Type');
+    if (!userType || !checkPermission(userType, 'ai:update')) {
+      return NextResponse.json(
+        { ok: false, error: '没有权限更新模块配置。' },
+        { status: 403 }
+      );
+    }
+
     const body = await request.json();
     const { moduleKey, modelId, useAutomatic } = body;
 

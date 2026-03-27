@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { StreamingAiPanel } from "@/components/streaming-ai-panel";
 import type { AiQualityReport } from "@/lib/quality-check";
@@ -39,57 +39,18 @@ export function AiRevisionPanel({
   const [showStreaming, setShowStreaming] = useState(false);
   const [activeTab, setActiveTab] = useState<"suggestions" | "preview">("suggestions");
 
-  useEffect(() => {
-    if (qualityReport && qualityReport.checks.length > 0) {
-      generateRevisionSuggestions();
-    }
-  }, [qualityReport]);
-
-  const generateRevisionSuggestions = async () => {
+  const generateRevisionSuggestions = useCallback(async () => {
     if (!qualityReport) return;
 
     setIsGenerating(true);
     setShowStreaming(true);
+  }, [qualityReport]);
 
-    try {
-      const response = await fetch("/api/ai/revision", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          projectId,
-          content,
-          qualityReport,
-          venueId
-        })
-      });
-
-      const data = await response.json();
-
-      if (data.ok && data.revisions) {
-        const formattedRevisions: RevisionSuggestion[] = data.revisions.map(
-          (rev: any, index: number) => ({
-            id: `rev_${Date.now()}_${index}`,
-            section: rev.section || "未指定部分",
-            issue: rev.issue || "需要改进",
-            suggestion: rev.suggestion || "",
-            severity: rev.severity || "medium",
-            originalText: rev.originalText,
-            revisedText: rev.revisedText,
-            applied: false
-          })
-        );
-
-        setRevisions(formattedRevisions);
-      }
-    } catch (error) {
-      console.error("生成改稿建议失败:", error);
-    } finally {
-      setIsGenerating(false);
-      setShowStreaming(false);
+  useEffect(() => {
+    if (qualityReport && qualityReport.checks.length > 0) {
+      void generateRevisionSuggestions();
     }
-  };
+  }, [generateRevisionSuggestions, qualityReport]);
 
   const handleApplyRevision = (revision: RevisionSuggestion) => {
     const updatedRevisions = revisions.map((rev) =>
@@ -203,7 +164,7 @@ export function AiRevisionPanel({
       {revisions.length === 0 ? (
         <div className="empty-state">
           <p>暂无改稿建议</p>
-          <p>点击"重新生成建议"获取 AI 智能改稿建议</p>
+          <p>点击“重新生成建议”按钮获取 AI 智能改稿建议</p>
         </div>
       ) : (
         <>

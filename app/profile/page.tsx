@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getAuthToken, logout } from "@/lib/auth";
 
@@ -41,45 +41,60 @@ export default function ProfilePage() {
   };
 
   useEffect(() => {
-    fetchUserInfo();
-  }, []);
+    let cancelled = false;
 
-  const fetchUserInfo = async () => {
-    const token = getAuthToken();
-    if (!token) {
-      router.push("/login");
-      return;
-    }
-
-    try {
-      const response = await fetch("/api/auth/me", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error("获取用户信息失败");
+    async function fetchUserInfo() {
+      const token = getAuthToken();
+      if (!token) {
+        router.push("/login");
+        return;
       }
 
-      const data = await response.json();
-      setUserInfo(data.user);
-      setEditForm({
-        username: data.user.username,
-        fullName: data.user.fullName,
-        institution: data.user.institution,
-        department: data.user.department,
-      });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "获取用户信息失败");
-      // 跳转到登录页
-      setTimeout(() => {
-        router.push("/login");
-      }, 2000);
-    } finally {
-      setLoading(false);
+      try {
+        const response = await fetch("/api/auth/me", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error("获取用户信息失败");
+        }
+
+        const data = await response.json();
+        if (cancelled) {
+          return;
+        }
+
+        setUserInfo(data.user);
+        setEditForm({
+          username: data.user.username,
+          fullName: data.user.fullName,
+          institution: data.user.institution,
+          department: data.user.department,
+        });
+      } catch (err) {
+        if (cancelled) {
+          return;
+        }
+
+        setError(err instanceof Error ? err.message : "获取用户信息失败");
+        setTimeout(() => {
+          router.push("/login");
+        }, 2000);
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
     }
-  };
+
+    void fetchUserInfo();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;

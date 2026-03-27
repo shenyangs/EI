@@ -99,7 +99,7 @@ export function ChapterWritingStudio({
   const [streamingProcessor, setStreamingProcessor] = useState<StreamingAiProcessor | null>(null);
 
   const activeChapter = chapters.find((chapter) => chapter.id === activeChapterId);
-  const activeParagraphs = draftMap[activeChapterId] || [];
+  const activeParagraphs = useMemo(() => draftMap[activeChapterId] ?? [], [draftMap, activeChapterId]);
 
   // 检查章节内容是否为空
   const isChapterEmpty = useMemo(() => {

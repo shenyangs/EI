@@ -1,8 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDatabase } from '@/lib/server/db';
+import { authMiddleware, checkPermission } from '@/lib/server/auth-middleware';
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const authResponse = await authMiddleware(request);
+    if (authResponse.status !== 200) {
+      return authResponse;
+    }
+
+    const userType = authResponse.headers.get('X-User-Type');
+    if (!userType || !checkPermission(userType, 'ai:update')) {
+      return NextResponse.json(
+        { ok: false, error: '没有权限更新AI模型。' },
+        { status: 403 }
+      );
+    }
+
     const { id: idStr } = await params;
     const id = parseInt(idStr);
     if (isNaN(id)) {
@@ -65,6 +79,19 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const authResponse = await authMiddleware(request);
+    if (authResponse.status !== 200) {
+      return authResponse;
+    }
+
+    const userType = authResponse.headers.get('X-User-Type');
+    if (!userType || !checkPermission(userType, 'ai:delete')) {
+      return NextResponse.json(
+        { ok: false, error: '没有权限删除AI模型。' },
+        { status: 403 }
+      );
+    }
+
     const { id: idStr } = await params;
     const id = parseInt(idStr);
     if (isNaN(id)) {

@@ -1,4 +1,4 @@
-
+import { NextResponse } from "next/server";
 import { AiTaskType, AiTaskContext, orchestrateAIRequest, AiOrchestrator } from "@/lib/ai/ai-orchestrator";
 
 export const maxDuration = 60;
@@ -24,29 +24,68 @@ type ThinkRequest = {
   };
 };
 
+function normalizeThinkResult(result: any) {
+  if (Array.isArray(result)) {
+    return {
+      content: JSON.stringify(result),
+      metadata: {
+        items: result
+      }
+    };
+  }
+
+  if (result?.content) {
+    if (typeof result.content === "string") {
+      return {
+        content: result.content,
+        metadata: {}
+      };
+    }
+
+    if (typeof result.content === "object") {
+      return {
+        content: result.content.content ?? JSON.stringify(result.content),
+        ...result.content
+      };
+    }
+  }
+
+  if (result?.data) {
+    return {
+      content: typeof result.data.content === "string" ? result.data.content : JSON.stringify(result.data),
+      metadata: result.data
+    };
+  }
+
+  return {
+    content: JSON.stringify(result),
+    metadata: {}
+  };
+}
+
 export async function POST(request: Request) {
   let body: ThinkRequest;
 
   try {
     body = (await request.json()) as ThinkRequest;
   } catch {
-    return new Response(JSON.stringify({
-      ok: false,
-      error: "请求体不是合法 JSON。"
-    }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "请求体不是合法 JSON。"
+      },
+      { status: 400 }
+    );
   }
 
   if (!body.taskType || !body.context) {
-    return new Response(JSON.stringify({
-      ok: false,
-      error: "缺少必要的任务类型和上下文信息。"
-    }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "缺少必要的任务类型和上下文信息。"
+      },
+      { status: 400 }
+    );
   }
 
   try {
@@ -79,13 +118,13 @@ export async function POST(request: Request) {
       case 'revision_suggestions':
         // 这些任务需要 content 字段
         if (!body.content) {
-          return new Response(JSON.stringify({
-            ok: false,
-            error: "该任务类型需要提供内容。"
-          }), {
-            status: 400,
-            headers: { 'Content-Type': 'application/json' }
-          });
+          return NextResponse.json(
+            {
+              ok: false,
+              error: "该任务类型需要提供内容。"
+            },
+            { status: 400 }
+          );
         }
         try {
           result = await AiOrchestrator.runTask(body.taskType, body.content, body.context);
@@ -104,13 +143,13 @@ export async function POST(request: Request) {
       default:
         // 使用旧的 runTask 方法处理其他任务
         if (!body.content) {
-          return new Response(JSON.stringify({
-            ok: false,
-            error: "该任务类型需要提供内容。"
-          }), {
-            status: 400,
-            headers: { 'Content-Type': 'application/json' }
-          });
+          return NextResponse.json(
+            {
+              ok: false,
+              error: "该任务类型需要提供内容。"
+            },
+            { status: 400 }
+          );
         }
         try {
           result = await AiOrchestrator.runTask(body.taskType, body.content, body.context);
@@ -127,69 +166,27 @@ export async function POST(request: Request) {
         break;
     }
 
-    // 生成流式响应
-    let content: string;
-    try {
-      // 尝试从不同的结构中获取内容
-      if (Array.isArray(result)) {
-        content = JSON.stringify(result);
-      } else if ((result as any).content) {
-        const resultContent = (result as any).content;
-        if (typeof resultContent === 'string') {
-          content = resultContent;
-        } else if (resultContent.content) {
-          content = resultContent.content;
-        } else {
-          content = JSON.stringify(resultContent);
-        }
-      } else if ((result as any).data) {
-        content = JSON.stringify((result as any).data);
-      } else {
-        content = JSON.stringify(result);
-      }
-    } catch {
-      content = JSON.stringify(result);
-    }
-    
-    const stream = new ReadableStream({
-      async start(controller) {
-        for (let i = 0; i < content.length; i++) {
-          controller.enqueue(new TextEncoder().encode(content[i]));
-          await new Promise(resolve => setTimeout(resolve, 10));
-        }
-        controller.close();
-      }
-    });
+    const normalized = normalizeThinkResult(result);
 
-    return new Response(stream, {
-      headers: {
-        'Content-Type': 'text/plain',
-        'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive'
-      }
+    return NextResponse.json({
+      ok: true,
+      content: normalized,
+      raw: result
     });
   } catch (error) {
     console.error('Unexpected error in think route:', error);
     const message = error instanceof Error ? error.message : "AI 思考过程失败。";
 
-    const fallbackContent = `AI 处理失败: ${message}`;
-
-    const stream = new ReadableStream({
-      async start(controller) {
-        for (let i = 0; i < fallbackContent.length; i++) {
-          controller.enqueue(new TextEncoder().encode(fallbackContent[i]));
-          await new Promise(resolve => setTimeout(resolve, 10));
+    return NextResponse.json({
+      ok: true,
+      content: {
+        content: `AI 处理失败: ${message}`,
+        metadata: {
+          isFallback: true
         }
-        controller.close();
-      }
-    });
-
-    return new Response(stream, {
-      headers: {
-        'Content-Type': 'text/plain',
-        'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive'
-      }
+      },
+      error: message,
+      fallback: true
     });
   }
 }

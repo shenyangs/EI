@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { ArchiveActionPanel } from "@/components/archive-action-panel";
 import { QualityReviewPanel } from "@/components/quality-review-panel";
@@ -287,7 +287,7 @@ export function OutlineWorkbench({
 
       generateOutline();
     }
-  }, [projectId, selectedDirection, projectTitle, initialPackages, initialOutline]);
+  }, [projectId, selectedDirection, projectTitle, initialPackages, initialOutline, venueId]);
 
   const selected = useMemo(
     () => packages.find((item) => item.id === selectedId) ?? packages[0],
@@ -295,6 +295,82 @@ export function OutlineWorkbench({
   );
   const currentTitle = customTitle.trim() || selected?.title || "";
   const currentReviewKey = selected?.id ?? "unknown";
+  const archiveKey = "outline";
+  const {
+    error: historyError,
+    loading: historyLoading,
+    saveVersion,
+    saving,
+    versions
+  } = useProjectVersionHistory<OutlineVersionPayload>(projectId, archiveKey);
+
+  const runPackageCheck = useCallback(async () => {
+    if (!selected) {
+      return;
+    }
+
+    const abstractContent = selected.abstract;
+
+    setReviewLoading(true);
+    setMessage(`正在检查“${selected.label}”的标题与摘要质量...`);
+
+    try {
+      const result = await requestCheck({
+        title: currentTitle,
+        content: abstractContent,
+        venueId
+      });
+
+      if (!result.ok) {
+        throw new Error(result.error ?? "标题摘要自检失败");
+      }
+
+      setReviewMap((current) => ({
+        ...current,
+        [currentReviewKey]: {
+          overall: result.overall,
+          summary: result.summary,
+          checks: result.checks,
+          rewritePriorities: result.rewritePriorities,
+          metrics: result.metrics
+        }
+      }));
+      setMessage("标题摘要已完成自检，你可以先看风险提示，再决定是否继续进入正文。");
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "标题摘要自检失败。";
+
+      setReviewMap((current) => ({
+        ...current,
+        [currentReviewKey]: {
+          overall: "建议修改",
+          summary: "当前未能拿到完整标题摘要自检结果",
+          checks: [
+            {
+              dimension: "自检链路",
+              level: "建议修改",
+              detail: errorMessage
+            }
+          ],
+          rewritePriorities: ["稍后重新检查当前标题摘要"],
+          metrics: {
+            charCount: abstractContent.replace(/\s+/g, "").length,
+            paragraphCount: 1
+          }
+        }
+      }));
+      setMessage("标题摘要自检暂时失败，已经保留错误信息，你可以稍后重试。");
+    } finally {
+      setReviewLoading(false);
+    }
+  }, [currentReviewKey, currentTitle, selected, venueId]);
+
+  useEffect(() => {
+    if (loading || skipStreaming || !selected || reviewMap[currentReviewKey]) {
+      return;
+    }
+
+    void runPackageCheck();
+  }, [currentReviewKey, loading, reviewMap, runPackageCheck, selected, skipStreaming]);
 
   // 跳过流式生成，直接使用默认大纲
   if (skipStreaming) {
@@ -635,20 +711,12 @@ export function OutlineWorkbench({
   }
 
   const abstractNote = customAbstractNote.trim();
-  const archiveKey = "outline";
   const currentSummary = `标题：${currentTitle}；当前框架共 ${outline.length} 个章节节点${
     abstractNote ? `；摘要提醒：${abstractNote}` : "；摘要暂未附加修改提醒。"
   }`;
   const currentFingerprint = createArchiveFingerprint([selected.id, currentTitle, abstractNote]);
   const archiveRecord = getRecord(archiveKey);
   const isCurrentArchived = matchesCurrent(archiveKey, currentFingerprint);
-  const {
-    error: historyError,
-    loading: historyLoading,
-    saveVersion,
-    saving,
-    versions
-  } = useProjectVersionHistory<OutlineVersionPayload>(projectId, archiveKey);
 
   async function handleArchive() {
     const localRecord = archiveCurrent({
@@ -697,70 +765,6 @@ export function OutlineWorkbench({
     });
     setMessage("已恢复到之前确认过的框架版本。你现在看到的标题、摘要提醒和章节骨架，已经回到那次存档时的状态。");
   }
-
-  async function runPackageCheck() {
-    const abstractContent = selected.abstract;
-
-    setReviewLoading(true);
-    setMessage(`正在检查“${selected.label}”的标题与摘要质量...`);
-
-    try {
-      const result = await requestCheck({
-        title: currentTitle,
-        content: abstractContent,
-        venueId
-      });
-
-      if (!result.ok) {
-        throw new Error(result.error ?? "标题摘要自检失败");
-      }
-
-      setReviewMap((current) => ({
-        ...current,
-        [currentReviewKey]: {
-          overall: result.overall,
-          summary: result.summary,
-          checks: result.checks,
-          rewritePriorities: result.rewritePriorities,
-          metrics: result.metrics
-        }
-      }));
-      setMessage("标题摘要已完成自检，你可以先看风险提示，再决定是否继续进入正文。");
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "标题摘要自检失败。";
-
-      setReviewMap((current) => ({
-        ...current,
-        [currentReviewKey]: {
-          overall: "建议修改",
-          summary: "当前未能拿到完整标题摘要自检结果",
-          checks: [
-            {
-              dimension: "自检链路",
-              level: "建议修改",
-              detail: errorMessage
-            }
-          ],
-          rewritePriorities: ["稍后重新检查当前标题摘要"],
-          metrics: {
-            charCount: abstractContent.replace(/\s+/g, "").length,
-            paragraphCount: 1
-          }
-        }
-      }));
-      setMessage("标题摘要自检暂时失败，已经保留错误信息，你可以稍后重试。");
-    } finally {
-      setReviewLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    if (reviewMap[currentReviewKey]) {
-      return;
-    }
-
-    void runPackageCheck();
-  }, [currentReviewKey, reviewMap, selected.abstract, selected.label, venueId]);
 
   return (
     <div className="workbench-stack">

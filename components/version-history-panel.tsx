@@ -70,7 +70,7 @@ export function VersionHistoryPanel<TPayload extends ProjectVersionPayload>({
       {!loading && versions.length === 0 ? (
         <div className="hint-panel top-gap">
           <strong>还没有服务端历史</strong>
-          <p>你第一次点"确认并存档"后，这里就会出现可回滚的版本记录。</p>
+          <p>你第一次点击确认并存档后，这里就会出现可回滚的版本记录。</p>
         </div>
       ) : null}
 

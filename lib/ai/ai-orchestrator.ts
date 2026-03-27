@@ -141,6 +141,10 @@ async function getPreferredModelForTask(taskType: TaskType, options: Orchestrato
       break;
   }
 
+  if (!model) {
+    model = await getDefaultModel();
+  }
+
   return model;
 }
 

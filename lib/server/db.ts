@@ -2,12 +2,12 @@
 export interface Project {
   id: string;
   title: string;
-  subject: string;
-  keywords: string;
-  description: string;
+  subject?: string;
+  keywords?: string;
+  description?: string;
   createdAt: string;
   updatedAt: string;
-  venueId: string;
+  venueId?: string;
 }
 
 export interface ProjectVersion {
@@ -56,7 +56,7 @@ export interface User {
 }
 
 // 内存存储模拟数据库
-export const memoryStore: {
+type MemoryStore = {
   projects: Project[];
   projectVersions: ProjectVersion[];
   academicPapers: any[];
@@ -64,15 +64,29 @@ export const memoryStore: {
   aiModels: AIModel[];
   aiModuleConfigs: AiModuleConfig[];
   users: User[];
-} = {
-  projects: [],
-  projectVersions: [],
-  academicPapers: [],
-  projectReferences: [],
-  aiModels: [],
-  aiModuleConfigs: [],
-  users: []
 };
+
+function createMemoryStore(): MemoryStore {
+  return {
+    projects: [],
+    projectVersions: [],
+    academicPapers: [],
+    projectReferences: [],
+    aiModels: [],
+    aiModuleConfigs: [],
+    users: []
+  };
+}
+
+declare global {
+  var __EI_MEMORY_STORE__: MemoryStore | undefined;
+}
+
+export const memoryStore: MemoryStore = globalThis.__EI_MEMORY_STORE__ || createMemoryStore();
+
+if (!globalThis.__EI_MEMORY_STORE__) {
+  globalThis.__EI_MEMORY_STORE__ = memoryStore;
+}
 
 // 数据库接口
 export interface Database {
@@ -150,6 +164,8 @@ class SqlExecutor {
       return this.store.projects;
     } else if (sql.includes('SELECT * FROM project_versions')) {
       return this.handleGetProjectVersions(params);
+    } else if (sql.includes('SELECT * FROM ai_models WHERE provider =')) {
+      return this.handleGetAiModelsByProvider(params);
     } else if (sql.includes('SELECT * FROM ai_models')) {
       return this.store.aiModels;
     } else if (sql.includes('SELECT * FROM ai_module_configs')) {
@@ -167,6 +183,21 @@ class SqlExecutor {
 
   // 处理INSERT INTO projects
   private handleInsertProjects(params?: any[]): void {
+    if ((params || []).length === 6) {
+      const [id, title, description, createdAt, updatedAt, venueId] = params || [];
+      this.store.projects.push({
+        id,
+        title,
+        subject: '',
+        keywords: '',
+        description,
+        createdAt,
+        updatedAt,
+        venueId
+      });
+      return;
+    }
+
     const [id, title, subject, keywords, description, createdAt, updatedAt, venueId] = params || [];
     this.store.projects.push({
       id,
@@ -197,7 +228,21 @@ class SqlExecutor {
 
   // 处理INSERT INTO ai_models
   private handleInsertAiModels(params?: any[]): void {
-    const [id, name, provider, model, baseUrl, apiKey, isDefault, createdAt] = params || [];
+    let id;
+    let name;
+    let provider;
+    let model;
+    let baseUrl;
+    let apiKey;
+    let isDefault;
+    let createdAt;
+
+    if ((params || []).length === 7) {
+      [name, provider, model, baseUrl, apiKey, isDefault, createdAt] = params || [];
+    } else {
+      [id, name, provider, model, baseUrl, apiKey, isDefault, createdAt] = params || [];
+    }
+
     this.store.aiModels.push({
       id: id || this.store.aiModels.length + 1,
       name,
@@ -251,6 +296,18 @@ class SqlExecutor {
 
   // 处理UPDATE ai_models
   private handleUpdateAiModels(params?: any[]): void {
+    if ((params || []).length === 2) {
+      const [isDefault, id] = params || [];
+      const index = this.store.aiModels.findIndex(m => m.id === id);
+      if (index !== -1) {
+        this.store.aiModels[index] = {
+          ...this.store.aiModels[index],
+          isDefault
+        };
+      }
+      return;
+    }
+
     const [name, provider, model, baseUrl, apiKey, isDefault, id] = params || [];
     const index = this.store.aiModels.findIndex(m => m.id === id);
     if (index !== -1) {
@@ -332,6 +389,12 @@ class SqlExecutor {
   private handleGetAiModelById(params?: any[]): AIModel | undefined {
     const [id] = params || [];
     return this.store.aiModels.find(m => m.id === id);
+  }
+
+  // 处理SELECT * FROM ai_models WHERE provider =
+  private handleGetAiModelsByProvider(params?: any[]): AIModel[] {
+    const [provider] = params || [];
+    return this.store.aiModels.filter(m => m.provider === provider);
   }
 
   // 处理SELECT * FROM ai_models WHERE isDefault = 1

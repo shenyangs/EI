@@ -1,6 +1,7 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getDatabase } from '@/lib/server/db';
 import { isCertificateChainError, requestTextWithCurl } from '@/lib/curl-transport';
+import { authMiddleware, checkPermission } from '@/lib/server/auth-middleware';
 
 type OpenAiCompatibleResponse = {
   choices?: Array<{
@@ -19,6 +20,10 @@ async function requestModel(
   try {
     let finalEndpoint = endpoint;
     let finalBody = body;
+    let headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`
+    };
 
     // 处理Gemini模型的特殊格式
     if (provider === 'google') {
@@ -52,14 +57,18 @@ async function requestModel(
           temperature: body.temperature || 0
         }
       };
+
+      finalEndpoint = endpoint.includes('?')
+        ? `${endpoint}&key=${encodeURIComponent(apiKey)}`
+        : `${endpoint}?key=${encodeURIComponent(apiKey)}`;
+      headers = {
+        'Content-Type': 'application/json'
+      };
     }
 
     const response = await fetch(finalEndpoint, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`
-      },
+      headers,
       body: JSON.stringify(finalBody),
       cache: 'no-store'
     });
@@ -93,6 +102,10 @@ async function requestModel(
 
     let finalEndpoint = endpoint;
     let finalBody = body;
+    let headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`
+    };
 
     // 处理Gemini模型的特殊格式
     if (provider === 'google') {
@@ -126,15 +139,19 @@ async function requestModel(
           temperature: body.temperature || 0
         }
       };
+
+      finalEndpoint = endpoint.includes('?')
+        ? `${endpoint}&key=${encodeURIComponent(apiKey)}`
+        : `${endpoint}?key=${encodeURIComponent(apiKey)}`;
+      headers = {
+        'Content-Type': 'application/json'
+      };
     }
 
     const { status, text } = await requestTextWithCurl({
       url: finalEndpoint,
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`
-      },
+      headers,
       body: JSON.stringify(finalBody),
       timeoutSeconds: 10
     });
@@ -162,8 +179,21 @@ async function requestModel(
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
+    const authResponse = await authMiddleware(request);
+    if (authResponse.status !== 200) {
+      return authResponse;
+    }
+
+    const userType = authResponse.headers.get('X-User-Type');
+    if (!userType || !checkPermission(userType, 'ai:read')) {
+      return NextResponse.json(
+        { ok: false, error: '没有权限测试模型连接。' },
+        { status: 403 }
+      );
+    }
+
     const body = await request.json();
     const { modelId } = body;
 

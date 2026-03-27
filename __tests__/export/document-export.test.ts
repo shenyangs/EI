@@ -94,14 +94,15 @@ describe('Document Export', () => {
       expect(results[1].filename).toBe('论文2.tex');
     });
 
-    it('should handle mixed success and failure', async () => {
+    it('should use the shared batch format for every document', async () => {
       const validOptions = { ...mockOptions };
       const invalidOptions = { ...mockOptions, format: 'invalid' as any };
       
       const results = await batchExport([validOptions, invalidOptions], 'latex');
       
       expect(results[0].success).toBe(true);
-      expect(results[1].success).toBe(false);
+      expect(results[1].success).toBe(true);
+      expect(results[1].filename).toBe('测试论文标题.tex');
     });
   });
 

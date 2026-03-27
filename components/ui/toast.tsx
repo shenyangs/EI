@@ -32,13 +32,16 @@ const ToastContext = createContext<ToastContextType | undefined>(undefined);
 export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
+  const hideToast = useCallback((id: string) => {
+    setToasts(prev => prev.filter(t => t.id !== id));
+  }, []);
+
   const showToast = useCallback((toast: Omit<Toast, 'id'>): string => {
     const id = `toast_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const newToast: Toast = { ...toast, id };
     
     setToasts(prev => [...prev, newToast]);
 
-    // 自动隐藏
     if (toast.duration !== 0) {
       setTimeout(() => {
         hideToast(id);
@@ -46,11 +49,7 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
 
     return id;
-  }, []);
-
-  const hideToast = useCallback((id: string) => {
-    setToasts(prev => prev.filter(t => t.id !== id));
-  }, []);
+  }, [hideToast]);
 
   const updateToast = useCallback((id: string, updates: Partial<Toast>) => {
     setToasts(prev =>

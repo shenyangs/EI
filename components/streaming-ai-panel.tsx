@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { streamAiTask, type StreamChunk } from "@/lib/streaming-ai";
 
@@ -32,8 +32,118 @@ export function StreamingAiPanel({
   const [contentProgress, setContentProgress] = useState(0);
   const [qualityResult, setQualityResult] = useState<any>(null);
   const [nextSteps, setNextSteps] = useState<any[]>([]);
+  const [, setRevisionResult] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+  const generatedContentRef = useRef("");
+  const qualityResultRef = useRef<any>(null);
+  const nextStepsRef = useRef<any[]>([]);
+  const revisionResultRef = useRef<any[]>([]);
+
+  useEffect(() => {
+    if (contentRef.current) {
+      contentRef.current.scrollTop = contentRef.current.scrollHeight;
+    }
+  }, [generatedContent]);
+
+  const handleThinkingChunk = useCallback((data: any) => {
+    if (data.status === "progress" && data.step) {
+      setThinkingSteps(prev => [...prev, data.step]);
+      setThinkingProgress(data.progress || 0);
+    } else if (data.status === "completed") {
+      setPhase("generating");
+    } else if (data.thoughts) {
+      setThinkingSteps((prev) => [...prev, data.thoughts]);
+      setThinkingProgress(data.confidence ?? 0.3);
+    }
+  }, []);
+
+  const handleContentChunk = useCallback((data: any) => {
+    if (data.status === "progress" && data.chunk) {
+      setGeneratedContent((prev) => {
+        const next = prev + data.chunk;
+        generatedContentRef.current = next;
+        return next;
+      });
+      setContentProgress(data.progress || 0);
+    } else if (data.status === "completed") {
+      const finalContent = data.content || "";
+      generatedContentRef.current = finalContent;
+      setGeneratedContent(finalContent);
+      setPhase("checking");
+    } else if (typeof data.content === "string") {
+      generatedContentRef.current = data.content;
+      setGeneratedContent(data.content);
+      setPhase("checking");
+    } else if (typeof data.chunk === "string") {
+      setGeneratedContent((prev) => {
+        const next = prev + data.chunk;
+        generatedContentRef.current = next;
+        return next;
+      });
+    }
+  }, []);
+
+  const handleQualityChunk = useCallback((data: any) => {
+    if (data.status === "completed" && data.quality) {
+      setQualityResult(data.quality);
+      qualityResultRef.current = data.quality;
+    }
+  }, []);
+
+  const handleNextStepsChunk = useCallback((data: any) => {
+    if (data.nextSteps) {
+      setNextSteps(data.nextSteps);
+      nextStepsRef.current = data.nextSteps;
+    }
+  }, []);
+
+  const handleRevisionChunk = useCallback((data: any) => {
+    const revisions = Array.isArray(data?.revisions)
+      ? data.revisions
+      : Array.isArray(data)
+        ? data
+        : [];
+
+    if (revisions.length > 0) {
+      setRevisionResult(revisions);
+      revisionResultRef.current = revisions;
+    }
+  }, []);
+
+  const handleStreamChunk = useCallback((chunk: StreamChunk) => {
+    switch (chunk.type) {
+      case "thinking":
+        handleThinkingChunk(chunk.data);
+        break;
+      case "content":
+        handleContentChunk(chunk.data);
+        break;
+      case "quality":
+        handleQualityChunk(chunk.data);
+        break;
+      case "next_steps":
+        handleNextStepsChunk(chunk.data);
+        break;
+      case "revision":
+        handleRevisionChunk(chunk.data);
+        break;
+      case "error":
+        setError(chunk.data.message);
+        setPhase("error");
+        onError?.(chunk.data.message);
+        break;
+      case "complete":
+        setPhase("complete");
+        onComplete?.({
+          content: generatedContentRef.current,
+          quality: qualityResultRef.current,
+          nextSteps: nextStepsRef.current,
+          revisions: revisionResultRef.current
+        });
+        break;
+    }
+  }, [handleContentChunk, handleNextStepsChunk, handleQualityChunk, handleRevisionChunk, handleThinkingChunk, onComplete, onError]);
 
   useEffect(() => {
     let cancelled = false;
@@ -46,7 +156,12 @@ export function StreamingAiPanel({
       setContentProgress(0);
       setQualityResult(null);
       setNextSteps([]);
+      setRevisionResult([]);
       setError(null);
+      generatedContentRef.current = "";
+      qualityResultRef.current = null;
+      nextStepsRef.current = [];
+      revisionResultRef.current = [];
 
       try {
         const generator = streamAiTask(taskType, context);
@@ -64,79 +179,12 @@ export function StreamingAiPanel({
       }
     }
 
-    startStreaming();
+    void startStreaming();
 
     return () => {
       cancelled = true;
     };
-  }, [taskType, context, onComplete, onError]);
-
-  useEffect(() => {
-    if (contentRef.current) {
-      contentRef.current.scrollTop = contentRef.current.scrollHeight;
-    }
-  }, [generatedContent]);
-
-  function handleStreamChunk(chunk: StreamChunk) {
-    switch (chunk.type) {
-      case "thinking":
-        handleThinkingChunk(chunk.data);
-        break;
-      case "content":
-        handleContentChunk(chunk.data);
-        break;
-      case "quality":
-        handleQualityChunk(chunk.data);
-        break;
-      case "next_steps":
-        handleNextStepsChunk(chunk.data);
-        break;
-      case "error":
-        setError(chunk.data.message);
-        setPhase("error");
-        onError?.(chunk.data.message);
-        break;
-      case "complete":
-        setPhase("complete");
-        onComplete?.({
-          content: generatedContent,
-          quality: qualityResult,
-          nextSteps
-        });
-        break;
-    }
-  }
-
-  function handleThinkingChunk(data: any) {
-    if (data.status === "progress" && data.step) {
-      setThinkingSteps(prev => [...prev, data.step]);
-      setThinkingProgress(data.progress || 0);
-    } else if (data.status === "completed") {
-      setPhase("generating");
-    }
-  }
-
-  function handleContentChunk(data: any) {
-    if (data.status === "progress" && data.chunk) {
-      setGeneratedContent(prev => prev + data.chunk);
-      setContentProgress(data.progress || 0);
-    } else if (data.status === "completed") {
-      setGeneratedContent(data.content || "");
-      setPhase("checking");
-    }
-  }
-
-  function handleQualityChunk(data: any) {
-    if (data.status === "completed" && data.quality) {
-      setQualityResult(data.quality);
-    }
-  }
-
-  function handleNextStepsChunk(data: any) {
-    if (data.nextSteps) {
-      setNextSteps(data.nextSteps);
-    }
-  }
+  }, [context, handleStreamChunk, onError, onComplete, taskType]);
 
   const getPhaseTitle = () => {
     switch (phase) {

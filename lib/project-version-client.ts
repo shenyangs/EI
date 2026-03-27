@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import type {
   CreateProjectVersionInput,
@@ -72,7 +72,7 @@ export function useProjectVersionHistory<TPayload extends ProjectVersionPayload>
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  async function refresh() {
+  const refresh = useCallback(async () => {
     setLoading(true);
 
     try {
@@ -85,11 +85,11 @@ export function useProjectVersionHistory<TPayload extends ProjectVersionPayload>
     } finally {
       setLoading(false);
     }
-  }
+  }, [key, projectId]);
 
   useEffect(() => {
     void refresh();
-  }, [projectId, key]);
+  }, [refresh]);
 
   async function saveVersion(input: CreateProjectVersionInput<TPayload>) {
     setSaving(true);

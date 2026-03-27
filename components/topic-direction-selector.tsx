@@ -169,10 +169,18 @@ export function TopicDirectionSelector({
 
       fetchDirections();
     }
-  }, [projectId, projectTitle, initialOptions]);
+  }, [projectId, projectTitle, initialOptions, venueId]);
 
   const selected = options.find((item) => item.id === selectedId) ?? options[0];
   const currentNote = customNote.trim();
+  const archiveKey = "topic-direction";
+  const {
+    error: historyError,
+    loading: historyLoading,
+    saveVersion,
+    saving,
+    versions
+  } = useProjectVersionHistory<TopicDirectionVersionPayload>(projectId, archiveKey);
 
   if (loading) {
     return (
@@ -197,20 +205,12 @@ export function TopicDirectionSelector({
     return null;
   }
 
-  const archiveKey = "topic-direction";
   const currentSummary = `当前采用：${selected.label}${
     currentNote ? `；附加提醒：${currentNote}` : "；暂未附加人工修改意见。"
   }`;
   const currentFingerprint = createArchiveFingerprint([selected.id, currentNote]);
   const archiveRecord = getRecord(archiveKey);
   const isCurrentArchived = matchesCurrent(archiveKey, currentFingerprint);
-  const {
-    error: historyError,
-    loading: historyLoading,
-    saveVersion,
-    saving,
-    versions
-  } = useProjectVersionHistory<TopicDirectionVersionPayload>(projectId, archiveKey);
 
   async function handleArchive() {
     const localRecord = archiveCurrent({

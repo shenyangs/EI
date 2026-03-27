@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { memoryStore } from './db';
 import { validateToken } from '@/lib/jwt';
-import { rateLimitMiddleware, httpsRedirectMiddleware, corsMiddleware } from './security';
+import {
+  applyCorsHeaders,
+  applySecurityHeaders,
+  rateLimitMiddleware,
+  httpsRedirectMiddleware
+} from './security';
 
 // 超管信息
 const SUPER_ADMIN = {
@@ -20,19 +25,16 @@ export async function applyMiddlewares(request: NextRequest) {
   // 应用HTTPS重定向
   const httpsResponse = httpsRedirectMiddleware(request);
   if (httpsResponse.status !== 200) {
-    return httpsResponse;
+    return applyCorsHeaders(applySecurityHeaders(httpsResponse), request);
   }
-  
-  // 应用CORS
-  const corsResponse = corsMiddleware(request);
-  
+
   // 应用速率限制
   const rateLimitResponse = rateLimitMiddleware(request);
   if (rateLimitResponse.status !== 200) {
-    return rateLimitResponse;
+    return applyCorsHeaders(applySecurityHeaders(rateLimitResponse), request);
   }
-  
-  return NextResponse.next();
+
+  return applyCorsHeaders(applySecurityHeaders(NextResponse.next()), request);
 }
 
 // 权限验证中间件
@@ -75,14 +77,8 @@ export async function authMiddleware(request: NextRequest) {
   if ('isSuperAdmin' in user) {
     response.headers.set('X-Is-Super-Admin', user.isSuperAdmin ? 'true' : 'false');
   }
-  
-  // 添加安全相关的响应头
-  response.headers.set('X-Content-Type-Options', 'nosniff');
-  response.headers.set('X-Frame-Options', 'DENY');
-  response.headers.set('X-XSS-Protection', '1; mode=block');
-  response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
-  
-  return response;
+
+  return applyCorsHeaders(applySecurityHeaders(response), request);
 }
 
 // 可选的认证中间件（用于不需要强制认证的路由）
@@ -106,12 +102,12 @@ export async function optionalAuthMiddleware(request: NextRequest) {
         const response = NextResponse.next();
         response.headers.set('X-User-Id', user.id);
         response.headers.set('X-User-Type', user.userType);
-        return response;
+        return applyCorsHeaders(applySecurityHeaders(response), request);
       }
     }
   }
 
-  return NextResponse.next();
+  return applyCorsHeaders(applySecurityHeaders(NextResponse.next()), request);
 }
 
 // 角色权限检查
@@ -240,8 +236,8 @@ export function permissionMiddleware(requiredPermission: string) {
     }
 
     // 获取用户类型和超管标识
-    const userType = request.headers.get('X-User-Type');
-    const isSuperAdmin = request.headers.get('X-Is-Super-Admin') === 'true';
+    const userType = authResponse.headers.get('X-User-Type');
+    const isSuperAdmin = authResponse.headers.get('X-Is-Super-Admin') === 'true';
     
     if (!userType && !isSuperAdmin) {
       return NextResponse.json({ error: '未授权' }, { status: 401 });
