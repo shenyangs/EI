@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { AiTaskType, AiTaskContext, orchestrateAIRequest, AiOrchestrator } from "@/lib/ai/ai-orchestrator";
+import { buildOutlineFallback } from "@/lib/outline-fallback";
 
 export const maxDuration = 60;
 export const runtime = 'edge';
@@ -494,6 +495,11 @@ async function generateTopicAnalysis(body: ThinkRequest) {
 async function generateOutline(body: ThinkRequest) {
   const projectTitle = clampPromptValue(body.context.projectTitle, 120);
   const selectedDirection = body.context.userInputs?.selectedDirection;
+  const fallbackOutline = buildOutlineFallback({
+    projectTitle,
+    selectedDirectionLabel: selectedDirection?.label,
+    selectedDirectionDescription: selectedDirection?.description
+  });
   
   let prompt = `请为以下研究项目生成详细的博士开题级别大纲：
 
@@ -547,9 +553,11 @@ async function generateOutline(body: ThinkRequest) {
     return {
       ok: true,
       content: {
-        content: generateDefaultOutline(projectTitle),
+        content: fallbackOutline.plainText,
         metadata: {
-          topics: ['研究背景', '研究方法', '研究结果', '讨论与分析', '结论与展望']
+          topics: fallbackOutline.keywords,
+          sections: fallbackOutline.sections,
+          isFallback: true
         }
       }
     };
@@ -713,40 +721,6 @@ function getDefaultDirections(title: string): any[] {
       readyOutputs: ['应用方案', '实施指南', '效果评估']
     }
   ];
-}
-
-// 生成默认大纲
-function generateDefaultOutline(title: string): string {
-  return `《${title}》论文大纲
-
-1. 绪论
-   1.1 研究背景与意义
-   1.2 国内外研究现状
-   1.3 研究目标与内容
-   1.4 研究方法与技术路线
-
-2. 理论基础与文献综述
-   2.1 核心概念界定
-   2.2 相关理论基础
-   2.3 国内外研究综述
-   2.4 研究缺口分析
-
-3. 研究设计
-   3.1 研究框架
-   3.2 研究方法
-   3.3 数据来源
-   3.4 分析工具
-
-4. 研究结果与分析
-   4.1 数据描述
-   4.2 结果分析
-   4.3 发现与讨论
-
-5. 结论与展望
-   5.1 研究结论
-   5.2 理论贡献
-   5.3 实践意义
-   5.4 研究局限与展望`;
 }
 
 // 生成默认项目分析

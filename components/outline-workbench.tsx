@@ -9,6 +9,7 @@ import { StatusBadge } from "@/components/status-badge";
 import { StreamingAiPanel } from "@/components/streaming-ai-panel";
 import { VersionHistoryPanel } from "@/components/version-history-panel";
 import type { OutlineSection, TitlePackage } from "@/lib/demo-data";
+import { buildOutlineFallback, buildOutlineFromContent } from "@/lib/outline-fallback";
 import {
   createArchiveFingerprint,
   shortenArchiveText,
@@ -70,6 +71,21 @@ function badgeTone(status: OutlineSection["status"]) {
   return "rose" as const;
 }
 
+const OUTLINE_GENERATION_TIMEOUT_MS = 40000;
+function buildGeneratedPackages(projectTitle: string | undefined, abstract: string, keywords?: string[]) {
+  return [
+    {
+      id: "package-1",
+      label: "博士开题版",
+      title: projectTitle || "研究主题",
+      abstract,
+      positioning: "基于选定研究方向的博士开题级别大纲",
+      recommendedReason: "符合博士开题要求，结构完整，逻辑严谨",
+      keywords: keywords && keywords.length > 0 ? keywords : ["研究主题", "研究方法", "创新点"]
+    }
+  ] satisfies TitlePackage[];
+}
+
 export function OutlineWorkbench({
   projectId,
   packages: initialPackages,
@@ -90,8 +106,6 @@ export function OutlineWorkbench({
   const [editingSection, setEditingSection] = useState<string | null>(null);
   const [editedSections, setEditedSections] = useState<Record<string, Partial<OutlineSection>>>({});
   const [useStreaming, setUseStreaming] = useState(true);
-  const [streamingResult, setStreamingResult] = useState<any>(null);
-  const [skipStreaming, setSkipStreaming] = useState(false);
   const {
     archiveCurrent,
     getRecord,
@@ -99,195 +113,149 @@ export function OutlineWorkbench({
     matchesCurrent,
     upsertRecord
   } = useProjectArchive(projectId);
+  const shouldGenerateOutline = Boolean(
+    (!initialPackages || !initialOutline) && projectId && selectedDirection && projectTitle
+  );
+  const fallbackOutline = useMemo(() => buildOutlineFallback({
+    projectTitle,
+    selectedDirectionLabel: selectedDirection?.label,
+    selectedDirectionDescription: selectedDirection?.description
+  }), [projectTitle, selectedDirection?.description, selectedDirection?.label]);
+
+  const applyGeneratedOutline = useCallback((content: string, keywords?: string[]) => {
+    const resolvedOutline = buildOutlineFromContent({
+      projectTitle,
+      selectedDirectionLabel: selectedDirection?.label,
+      selectedDirectionDescription: selectedDirection?.description,
+      content,
+      preferredKeywords: keywords
+    });
+    const generatedPackages = buildGeneratedPackages(projectTitle, resolvedOutline.abstract, resolvedOutline.keywords);
+
+    setPackages(generatedPackages);
+    setOutline(resolvedOutline.sections);
+    setSelectedId(generatedPackages[0]?.id ?? "");
+    setLoading(false);
+    setMessage("已生成大纲草案，你可以先检查结构，再继续逐章写作。");
+  }, [projectTitle, selectedDirection?.description, selectedDirection?.label]);
+
+  const applyDefaultOutline = useCallback((nextMessage = "AI 响应较慢，已先切换到默认大纲，你可以继续编辑并稍后重试。") => {
+    const defaultPackages = [
+      {
+        id: "package-1",
+        label: "默认版本",
+        title: projectTitle || "研究主题",
+        abstract: fallbackOutline.abstract,
+        positioning: "基于选定研究方向的博士开题级别大纲",
+        recommendedReason: "虽然 AI 还没完整返回，但这版已经按你的题目和方向先搭好了可写的研究骨架。",
+        keywords: fallbackOutline.keywords
+      }
+    ] satisfies TitlePackage[];
+
+    setPackages(defaultPackages);
+    setOutline(fallbackOutline.sections);
+    setSelectedId(defaultPackages[0]?.id ?? "");
+    setLoading(false);
+    setMessage(nextMessage);
+  }, [fallbackOutline.abstract, fallbackOutline.keywords, fallbackOutline.sections, projectTitle]);
 
   // 从AI生成博士开题级别的详细大纲
   useEffect(() => {
-    if ((!initialPackages || !initialOutline) && projectId && selectedDirection && projectTitle) {
-      setLoading(true);
-      
-      const generateOutline = async () => {
-        let timeoutId: NodeJS.Timeout | null = null;
-        
-        try {
-          // 准备请求选项
-          const requestOptions: RequestInit = {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-              taskType: "outline_generation",
-              context: {
-                projectId,
-                projectTitle,
-                venueId: venueId || "ieee-iccci-2026",
-                currentStep: "outline_generation",
-                previousSteps: [],
-                userInputs: {
-                  title: projectTitle,
-                  selectedDirection: selectedDirection.label,
-                  directionDescription: selectedDirection.description
-                }
-              }
-            })
-          };
-          
-          // 如果支持 AbortController，添加超时控制
-          if (typeof AbortController !== "undefined") {
-            const controller = new AbortController();
-            timeoutId = setTimeout(() => controller.abort(), 30000); // 30秒超时
-            requestOptions.signal = controller.signal;
-          }
-          
-          const response = await fetch("/api/ai/think", requestOptions);
-          
-          if (timeoutId) {
-            clearTimeout(timeoutId);
-          }
-
-          if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-          }
-
-          const data = await response.json();
-
-          if (data.ok) {
-            // 生成标题包
-            const generatedPackages: TitlePackage[] = [
-              {
-                id: "package-1",
-                label: "博士开题版",
-                title: projectTitle,
-                abstract: data.content?.content || "",
-                positioning: "基于选定研究方向的博士开题级别大纲",
-                recommendedReason: "符合博士开题要求，结构完整，逻辑严谨",
-                keywords: data.content?.metadata?.topics || ["研究主题", "研究方法", "创新点"]
-              }
-            ];
-            
-            // 生成详细大纲
-            const generatedOutline: OutlineSection[] = [
-              {
-                id: "section-1",
-                title: "1. 绪论",
-                status: "草稿中",
-                goal: "介绍研究背景、问题陈述和研究意义",
-                summary: "包括研究背景、研究问题、研究目的、研究意义、研究方法、论文结构等内容"
-              },
-              {
-                id: "section-2",
-                title: "2. 文献综述",
-                status: "草稿中",
-                goal: "梳理相关研究现状和理论基础",
-                summary: "包括国内外研究现状、理论基础、研究缺口等内容"
-              },
-              {
-                id: "section-3",
-                title: "3. 研究方法",
-                status: "草稿中",
-                goal: "详细描述研究设计和方法",
-                summary: "包括研究设计、数据收集方法、数据分析方法等内容"
-              },
-              {
-                id: "section-4",
-                title: "4. 研究结果",
-                status: "草稿中",
-                goal: "呈现研究数据和结果",
-                summary: "包括数据描述、结果分析、发现等内容"
-              },
-              {
-                id: "section-5",
-                title: "5. 讨论",
-                status: "草稿中",
-                goal: "解释研究结果的意义和影响",
-                summary: "包括结果解释、与现有研究的比较、理论贡献、实践意义等内容"
-              },
-              {
-                id: "section-6",
-                title: "6. 结论与展望",
-                status: "草稿中",
-                goal: "总结研究成果和未来研究方向",
-                summary: "包括研究结论、研究局限、未来研究方向等内容"
-              }
-            ];
-            
-            setPackages(generatedPackages);
-            setOutline(generatedOutline);
-            if (generatedPackages.length > 0) {
-              setSelectedId(generatedPackages[0].id);
-            }
-          }
-        } catch (error) {
-          console.error("生成大纲失败:", error);
-          // 提供默认大纲
-          const defaultPackages: TitlePackage[] = [
-            {
-              id: "package-1",
-              label: "默认版本",
-              title: projectTitle || "研究主题",
-              abstract: "本研究旨在...",
-              positioning: "基于选定研究方向的博士开题级别大纲",
-              recommendedReason: "符合博士开题要求，结构完整，逻辑严谨",
-              keywords: ["研究主题", "研究方法", "创新点"]
-            }
-          ];
-          
-          const defaultOutline: OutlineSection[] = [
-            {
-              id: "section-1",
-              title: "1. 绪论",
-              status: "草稿中",
-              goal: "介绍研究背景、问题陈述和研究意义",
-              summary: "包括研究背景、研究问题、研究目的、研究意义、研究方法、论文结构等内容"
-            },
-            {
-              id: "section-2",
-              title: "2. 文献综述",
-              status: "草稿中",
-              goal: "梳理相关研究现状和理论基础",
-              summary: "包括国内外研究现状、理论基础、研究缺口等内容"
-            },
-            {
-              id: "section-3",
-              title: "3. 研究方法",
-              status: "草稿中",
-              goal: "详细描述研究设计和方法",
-              summary: "包括研究设计、数据收集方法、数据分析方法等内容"
-            },
-            {
-              id: "section-4",
-              title: "4. 研究结果",
-              status: "草稿中",
-              goal: "呈现研究数据和结果",
-              summary: "包括数据描述、结果分析、发现等内容"
-            },
-            {
-              id: "section-5",
-              title: "5. 讨论",
-              status: "草稿中",
-              goal: "解释研究结果的意义和影响",
-              summary: "包括结果解释、与现有研究的比较、理论贡献、实践意义等内容"
-            },
-            {
-              id: "section-6",
-              title: "6. 结论与展望",
-              status: "草稿中",
-              goal: "总结研究成果和未来研究方向",
-              summary: "包括研究结论、研究局限、未来研究方向等内容"
-            }
-          ];
-          
-          setPackages(defaultPackages);
-          setOutline(defaultOutline);
-          setSelectedId("package-1");
-        } finally {
-          setLoading(false);
-        }
-      };
-
-      generateOutline();
+    if (!shouldGenerateOutline || useStreaming || !selectedDirection) {
+      return;
     }
-  }, [projectId, selectedDirection, projectTitle, initialPackages, initialOutline, venueId]);
+
+    const currentDirection = selectedDirection;
+
+    setLoading(true);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+    let cancelled = false;
+
+    const generateOutline = async () => {
+      try {
+        const response = await fetch("/api/ai/think", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            taskType: "outline_generation",
+            context: {
+              projectId,
+              projectTitle,
+              venueId: venueId || "ieee-iccci-2026",
+              currentStep: "outline_generation",
+              previousSteps: [],
+              userInputs: {
+                title: projectTitle,
+                selectedDirection: currentDirection.label,
+                directionDescription: currentDirection.description
+              }
+            }
+          }),
+          signal: controller.signal
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        if (cancelled) {
+          return;
+        }
+
+        if (data.ok) {
+          applyGeneratedOutline(data.content?.content || "", data.content?.metadata?.topics);
+          return;
+        }
+
+        applyDefaultOutline();
+      } catch (error) {
+        if (cancelled) {
+          return;
+        }
+
+        console.error("生成大纲失败:", error);
+        applyDefaultOutline();
+      } finally {
+        clearTimeout(timeoutId);
+      }
+    };
+
+    void generateOutline();
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timeoutId);
+      controller.abort();
+    };
+  }, [
+    applyDefaultOutline,
+    applyGeneratedOutline,
+    projectId,
+    projectTitle,
+    selectedDirection,
+    shouldGenerateOutline,
+    useStreaming,
+    venueId
+  ]);
+
+  useEffect(() => {
+    if (!loading || !shouldGenerateOutline) {
+      return;
+    }
+
+    const fallbackTimer = setTimeout(() => {
+      applyDefaultOutline("AI 超过 40 秒仍未完成，已自动切换到默认大纲，你可以先继续写作。");
+    }, OUTLINE_GENERATION_TIMEOUT_MS);
+
+    return () => {
+      clearTimeout(fallbackTimer);
+    };
+  }, [applyDefaultOutline, loading, shouldGenerateOutline]);
 
   const selected = useMemo(
     () => packages.find((item) => item.id === selectedId) ?? packages[0],
@@ -365,80 +333,12 @@ export function OutlineWorkbench({
   }, [currentReviewKey, currentTitle, selected, venueId]);
 
   useEffect(() => {
-    if (loading || skipStreaming || !selected || reviewMap[currentReviewKey]) {
+    if (loading || !selected || reviewMap[currentReviewKey]) {
       return;
     }
 
     void runPackageCheck();
-  }, [currentReviewKey, loading, reviewMap, runPackageCheck, selected, skipStreaming]);
-
-  // 跳过流式生成，直接使用默认大纲
-  if (skipStreaming) {
-    const defaultPackages: TitlePackage[] = [
-      {
-        id: "package-1",
-        label: "默认版本",
-        title: projectTitle || "研究主题",
-        abstract: "本研究旨在探讨选定研究方向的相关问题，通过系统的文献综述和实证研究，为学术界和实践领域提供有价值的见解。",
-        positioning: "基于选定研究方向的博士开题级别大纲",
-        recommendedReason: "符合博士开题要求，结构完整，逻辑严谨",
-        keywords: ["研究主题", "研究方法", "创新点"]
-      }
-    ];
-    
-    const defaultOutline: OutlineSection[] = [
-      {
-        id: "section-1",
-        title: "1. 绪论",
-        status: "草稿中",
-        goal: "介绍研究背景、问题陈述和研究意义",
-        summary: "包括研究背景、研究问题、研究目的、研究意义、研究方法、论文结构等内容"
-      },
-      {
-        id: "section-2",
-        title: "2. 文献综述",
-        status: "草稿中",
-        goal: "梳理相关研究现状和理论基础",
-        summary: "包括国内外研究现状、理论基础、研究缺口等内容"
-      },
-      {
-        id: "section-3",
-        title: "3. 研究方法",
-        status: "草稿中",
-        goal: "详细描述研究设计和方法",
-        summary: "包括研究设计、数据收集方法、数据分析方法等内容"
-      },
-      {
-        id: "section-4",
-        title: "4. 研究结果",
-        status: "草稿中",
-        goal: "呈现研究数据和结果",
-        summary: "包括数据描述、结果分析、发现等内容"
-      },
-      {
-        id: "section-5",
-        title: "5. 讨论",
-        status: "草稿中",
-        goal: "解释研究结果的意义和影响",
-        summary: "包括结果解释、与现有研究的比较、理论贡献、实践意义等内容"
-      },
-      {
-        id: "section-6",
-        title: "6. 结论与展望",
-        status: "草稿中",
-        goal: "总结研究成果和未来研究方向",
-        summary: "包括研究结论、研究局限、未来研究方向等内容"
-      }
-    ];
-    
-    setPackages(defaultPackages);
-    setOutline(defaultOutline);
-    setSelectedId("package-1");
-    setLoading(false);
-    setSkipStreaming(false);
-    setMessage("已使用默认大纲，您可以随时修改章节内容。");
-    return null;
-  }
+  }, [currentReviewKey, loading, reviewMap, runPackageCheck, selected]);
 
   if (loading && useStreaming && selectedDirection && projectTitle) {
     return (
@@ -454,7 +354,7 @@ export function OutlineWorkbench({
           <button 
             className="secondary-button" 
             style={{ marginTop: '20px', marginBottom: '20px', display: 'block', marginLeft: 'auto', marginRight: 'auto' }}
-            onClick={() => setSkipStreaming(true)}
+            onClick={() => applyDefaultOutline("已切换到默认大纲，你可以先继续编辑，稍后再重新生成。")}
             type="button"
           >
             使用默认大纲
@@ -474,137 +374,13 @@ export function OutlineWorkbench({
               }
             }}
             onComplete={(result) => {
-              setStreamingResult(result);
-              // 生成标题包
-              const generatedPackages: TitlePackage[] = [
-                {
-                  id: "package-1",
-                  label: "博士开题版",
-                  title: projectTitle,
-                  abstract: result.content || "",
-                  positioning: "基于选定研究方向的博士开题级别大纲",
-                  recommendedReason: "符合博士开题要求，结构完整，逻辑严谨",
-                  keywords: result.metadata?.topics || ["研究主题", "研究方法", "创新点"]
-                }
-              ];
-              
-              // 生成详细大纲
-              const generatedOutline: OutlineSection[] = [
-                {
-                  id: "section-1",
-                  title: "1. 绪论",
-                  status: "草稿中",
-                  goal: "介绍研究背景、问题陈述和研究意义",
-                  summary: "包括研究背景、研究问题、研究目的、研究意义、研究方法、论文结构等内容"
-                },
-                {
-                  id: "section-2",
-                  title: "2. 文献综述",
-                  status: "草稿中",
-                  goal: "梳理相关研究现状和理论基础",
-                  summary: "包括国内外研究现状、理论基础、研究缺口等内容"
-                },
-                {
-                  id: "section-3",
-                  title: "3. 研究方法",
-                  status: "草稿中",
-                  goal: "详细描述研究设计和方法",
-                  summary: "包括研究设计、数据收集方法、数据分析方法等内容"
-                },
-                {
-                  id: "section-4",
-                  title: "4. 研究结果",
-                  status: "草稿中",
-                  goal: "呈现研究数据和结果",
-                  summary: "包括数据描述、结果分析、发现等内容"
-                },
-                {
-                  id: "section-5",
-                  title: "5. 讨论",
-                  status: "草稿中",
-                  goal: "解释研究结果的意义和影响",
-                  summary: "包括结果解释、与现有研究的比较、理论贡献、实践意义等内容"
-                },
-                {
-                  id: "section-6",
-                  title: "6. 结论与展望",
-                  status: "草稿中",
-                  goal: "总结研究成果和未来研究方向",
-                  summary: "包括研究结论、研究局限、未来研究方向等内容"
-                }
-              ];
-              
-              setPackages(generatedPackages);
-              setOutline(generatedOutline);
-              if (generatedPackages.length > 0) {
-                setSelectedId(generatedPackages[0].id);
-              }
-              setLoading(false);
+              applyGeneratedOutline(result.content || "");
             }}
             onError={(error) => {
               console.error("流式生成失败:", error);
-              // 失败时回退到默认大纲
-              const defaultPackages: TitlePackage[] = [
-                {
-                  id: "package-1",
-                  label: "默认版本",
-                  title: projectTitle || "研究主题",
-                  abstract: "本研究旨在...",
-                  positioning: "基于选定研究方向的博士开题级别大纲",
-                  recommendedReason: "符合博士开题要求，结构完整，逻辑严谨",
-                  keywords: ["研究主题", "研究方法", "创新点"]
-                }
-              ];
-              
-              const defaultOutline: OutlineSection[] = [
-                {
-                  id: "section-1",
-                  title: "1. 绪论",
-                  status: "草稿中",
-                  goal: "介绍研究背景、问题陈述和研究意义",
-                  summary: "包括研究背景、研究问题、研究目的、研究意义、研究方法、论文结构等内容"
-                },
-                {
-                  id: "section-2",
-                  title: "2. 文献综述",
-                  status: "草稿中",
-                  goal: "梳理相关研究现状和理论基础",
-                  summary: "包括国内外研究现状、理论基础、研究缺口等内容"
-                },
-                {
-                  id: "section-3",
-                  title: "3. 研究方法",
-                  status: "草稿中",
-                  goal: "详细描述研究设计和方法",
-                  summary: "包括研究设计、数据收集方法、数据分析方法等内容"
-                },
-                {
-                  id: "section-4",
-                  title: "4. 研究结果",
-                  status: "草稿中",
-                  goal: "呈现研究数据和结果",
-                  summary: "包括数据描述、结果分析、发现等内容"
-                },
-                {
-                  id: "section-5",
-                  title: "5. 讨论",
-                  status: "草稿中",
-                  goal: "解释研究结果的意义和影响",
-                  summary: "包括结果解释、与现有研究的比较、理论贡献、实践意义等内容"
-                },
-                {
-                  id: "section-6",
-                  title: "6. 结论与展望",
-                  status: "草稿中",
-                  goal: "总结研究成果和未来研究方向",
-                  summary: "包括研究结论、研究局限、未来研究方向等内容"
-                }
-              ];
-              
-              setPackages(defaultPackages);
-              setOutline(defaultOutline);
-              setSelectedId("package-1");
-              setLoading(false);
+              setUseStreaming(false);
+              setLoading(true);
+              setMessage("流式链路失败，正在自动改用稳定模式重试一次大纲生成...");
             }}
           />
         </section>
@@ -631,71 +407,7 @@ export function OutlineWorkbench({
             <button 
               className="secondary-button" 
               style={{ marginTop: '20px' }}
-              onClick={() => {
-                // 使用默认大纲
-                const defaultPackages: TitlePackage[] = [
-                  {
-                    id: "package-1",
-                    label: "默认版本",
-                    title: projectTitle || "研究主题",
-                    abstract: "本研究旨在探讨选定研究方向的相关问题，通过系统的文献综述和实证研究，为学术界和实践领域提供有价值的见解。",
-                    positioning: "基于选定研究方向的博士开题级别大纲",
-                    recommendedReason: "符合博士开题要求，结构完整，逻辑严谨",
-                    keywords: ["研究主题", "研究方法", "创新点"]
-                  }
-                ];
-                
-                const defaultOutline: OutlineSection[] = [
-                  {
-                    id: "section-1",
-                    title: "1. 绪论",
-                    status: "草稿中",
-                    goal: "介绍研究背景、问题陈述和研究意义",
-                    summary: "包括研究背景、研究问题、研究目的、研究意义、研究方法、论文结构等内容"
-                  },
-                  {
-                    id: "section-2",
-                    title: "2. 文献综述",
-                    status: "草稿中",
-                    goal: "梳理相关研究现状和理论基础",
-                    summary: "包括国内外研究现状、理论基础、研究缺口等内容"
-                  },
-                  {
-                    id: "section-3",
-                    title: "3. 研究方法",
-                    status: "草稿中",
-                    goal: "详细描述研究设计和方法",
-                    summary: "包括研究设计、数据收集方法、数据分析方法等内容"
-                  },
-                  {
-                    id: "section-4",
-                    title: "4. 研究结果",
-                    status: "草稿中",
-                    goal: "呈现研究数据和结果",
-                    summary: "包括数据描述、结果分析、发现等内容"
-                  },
-                  {
-                    id: "section-5",
-                    title: "5. 讨论",
-                    status: "草稿中",
-                    goal: "解释研究结果的意义和影响",
-                    summary: "包括结果解释、与现有研究的比较、理论贡献、实践意义等内容"
-                  },
-                  {
-                    id: "section-6",
-                    title: "6. 结论与展望",
-                    status: "草稿中",
-                    goal: "总结研究成果和未来研究方向",
-                    summary: "包括研究结论、研究局限、未来研究方向等内容"
-                  }
-                ];
-                
-                setPackages(defaultPackages);
-                setOutline(defaultOutline);
-                setSelectedId("package-1");
-                setLoading(false);
-                setMessage("已使用默认大纲，您可以随时修改章节内容。");
-              }}
+              onClick={() => applyDefaultOutline("已切换到默认大纲，你可以先继续编辑，稍后再重新生成。")}
               type="button"
             >
               使用默认大纲

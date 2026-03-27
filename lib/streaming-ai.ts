@@ -15,6 +15,11 @@ export type StreamCallbacks = {
   onComplete?: () => void;
 };
 
+type StreamAiTaskOptions = {
+  signal?: AbortSignal;
+  timeoutMs?: number;
+};
+
 export class StreamingAiProcessor {
   private callbacks: StreamCallbacks;
   private buffer: string = '';
@@ -89,26 +94,22 @@ export class StreamingAiProcessor {
 
 export async function* streamAiTask(
   taskType: string,
-  context: any
+  context: any,
+  options: StreamAiTaskOptions = {}
 ): AsyncGenerator<StreamChunk, void, unknown> {
-  const response = await fetch('/api/ai/stream', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      taskType,
-      context
-    })
-  });
+  const controller = new AbortController();
+  const timeoutMs = options.timeoutMs ?? 40000;
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  const handleAbort = () => controller.abort();
+  let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
 
-  if (!response.ok) {
-    throw new Error(`Stream request failed: ${response.status}`);
-  }
-
-  const reader = response.body?.getReader();
-  if (!reader) {
-    throw new Error('No response body');
+  if (options.signal) {
+    if (options.signal.aborted) {
+      clearTimeout(timeoutId);
+      controller.abort();
+    } else {
+      options.signal.addEventListener('abort', handleAbort);
+    }
   }
 
   const Decoder = globalThis.TextDecoder || NodeTextDecoder;
@@ -146,6 +147,27 @@ export async function* streamAiTask(
   };
 
   try {
+    const response = await fetch('/api/ai/stream', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        taskType,
+        context
+      }),
+      signal: controller.signal
+    });
+
+    if (!response.ok) {
+      throw new Error(`Stream request failed: ${response.status}`);
+    }
+
+    reader = response.body?.getReader();
+    if (!reader) {
+      throw new Error('No response body');
+    }
+
     while (true) {
       const { done, value } = await reader.read();
       if (done) {
@@ -178,7 +200,26 @@ export async function* streamAiTask(
         break;
       }
     }
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      if (options.signal?.aborted) {
+        throw new Error('已取消当前生成请求');
+      }
+
+      throw new Error('AI 生成超时，请重试或先使用默认大纲继续。');
+    }
+
+    throw error;
   } finally {
-    reader.releaseLock();
+    clearTimeout(timeoutId);
+    options.signal?.removeEventListener('abort', handleAbort);
+
+    try {
+      await reader?.cancel();
+    } catch {
+      // 忽略取消读取时的清理异常
+    }
+
+    reader?.releaseLock();
   }
 }

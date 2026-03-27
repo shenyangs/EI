@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { orchestrateAIRequest, AiOrchestrator } from "@/lib/ai/ai-orchestrator";
+import { buildOutlineFallback } from "@/lib/outline-fallback";
 
 type StreamRequestContext = {
   projectId?: string;
@@ -166,7 +167,7 @@ async function resolveTask(taskType: string, context: StreamRequestContext) {
 }
 
 // 为不同任务类型生成默认内容
-function getDefaultContentForTask(taskType: string) {
+function getDefaultContentForTask(taskType: string, context: StreamRequestContext) {
   switch (taskType) {
     case "topic_analysis":
       return `【研究方向建议】
@@ -188,35 +189,11 @@ function getDefaultContentForTask(taskType: string) {
 
 【说明】AI 服务暂时不可用，以上为通用建议。`;
     case "outline_generation":
-      return `【论文大纲建议】
-
-1. 绪论
-   - 研究背景与意义
-   - 国内外研究现状
-   - 研究目标与内容
-
-2. 理论基础与文献综述
-   - 核心概念界定
-   - 相关理论基础
-   - 国内外研究综述
-
-3. 研究设计
-   - 研究框架
-   - 研究方法
-   - 数据来源
-
-4. 研究结果与分析
-   - 数据描述
-   - 结果分析
-   - 发现与讨论
-
-5. 结论与展望
-   - 研究结论
-   - 理论贡献
-   - 实践意义
-   - 研究局限与展望
-
-【说明】AI 服务暂时不可用，以上为通用大纲框架。`;
+      return buildOutlineFallback({
+        projectTitle: context.projectTitle,
+        selectedDirectionLabel: context.userInputs?.selectedDirection,
+        selectedDirectionDescription: context.userInputs?.directionDescription
+      }).plainText;
     case "content_generation":
       return `【内容生成】
 
@@ -299,7 +276,7 @@ export async function POST(request: Request) {
     } catch (error) {
       console.error("AI processing failed in stream:", error);
       result = {
-        content: getDefaultContentForTask(body.taskType!),
+        content: getDefaultContentForTask(body.taskType!, body.context!),
         revisions: body.taskType === "revision_suggestions"
           ? await AiOrchestrator.generateRevisionSuggestions("", {}, buildRevisionContext(body.context!))
           : [],

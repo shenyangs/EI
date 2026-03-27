@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { streamAiTask, type StreamChunk } from "@/lib/streaming-ai";
 
+const STREAMING_PANEL_TIMEOUT_MS = 35000;
+
 type StreamingPhase = 
   | "idle"
   | "thinking"
@@ -147,6 +149,7 @@ export function StreamingAiPanel({
 
   useEffect(() => {
     let cancelled = false;
+    const controller = new AbortController();
 
     async function startStreaming() {
       setPhase("thinking");
@@ -164,7 +167,10 @@ export function StreamingAiPanel({
       revisionResultRef.current = [];
 
       try {
-        const generator = streamAiTask(taskType, context);
+        const generator = streamAiTask(taskType, context, {
+          signal: controller.signal,
+          timeoutMs: STREAMING_PANEL_TIMEOUT_MS
+        });
 
         for await (const chunk of generator) {
           if (cancelled) break;
@@ -172,6 +178,10 @@ export function StreamingAiPanel({
           handleStreamChunk(chunk);
         }
       } catch (err) {
+        if (cancelled) {
+          return;
+        }
+
         const errorMessage = err instanceof Error ? err.message : "流式处理失败";
         setError(errorMessage);
         setPhase("error");
@@ -183,6 +193,7 @@ export function StreamingAiPanel({
 
     return () => {
       cancelled = true;
+      controller.abort();
     };
   }, [context, handleStreamChunk, onError, onComplete, taskType]);
 

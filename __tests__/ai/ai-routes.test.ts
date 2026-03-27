@@ -146,6 +146,42 @@ describe('AI routes', () => {
     expect(data.content.metadata.directions.length).toBeGreaterThan(0);
   });
 
+  it('think route should return semi-custom fallback outline when outline generation fails', async () => {
+    mockOrchestrateAIRequest.mockRejectedValue(new Error('AI 服务响应超时，请稍后重试'));
+
+    const response = await thinkPost(
+      new Request('http://localhost/api/ai/think', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          taskType: 'outline_generation',
+          context: {
+            projectId: 'project-1',
+            projectTitle: '智能服饰交互设计',
+            venueId: 'ieee-iccci-2026',
+            currentStep: 'outline_generation',
+            previousSteps: [],
+            userInputs: {
+              selectedDirection: {
+                label: '用户体验导向的设计研究',
+                description: '关注交互体验、使用场景与评价标准'
+              }
+            }
+          }
+        })
+      })
+    );
+
+    const data = await response.json();
+    expect(response.status).toBe(200);
+    expect(data.ok).toBe(true);
+    expect(data.content.content).toContain('智能服饰交互设计');
+    expect(data.content.content).toContain('用户体验导向的设计研究');
+    expect(data.content.metadata.isFallback).toBe(true);
+    expect(Array.isArray(data.content.metadata.sections)).toBe(true);
+    expect(data.content.metadata.sections[0].summary).toContain('用户体验导向的设计研究');
+  });
+
   it('stream route should support revision suggestion events', async () => {
     mockGenerateRevisionSuggestions.mockResolvedValue([
       {
@@ -179,6 +215,37 @@ describe('AI routes', () => {
     expect(response.headers.get('content-type')).toContain('text/event-stream');
     expect(text).toContain('"type":"revision"');
     expect(text).toContain('补充研究背景与问题界定');
+    expect(text).toContain('data: [DONE]');
+  });
+
+  it('stream route should emit semi-custom fallback outline content when AI fails', async () => {
+    mockOrchestrateAIRequest.mockRejectedValue(new Error('AI 服务响应超时，请稍后重试'));
+
+    const response = await streamPost(
+      new Request('http://localhost/api/ai/stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          taskType: 'outline_generation',
+          context: {
+            projectId: 'project-1',
+            projectTitle: '智能服饰交互设计',
+            currentStep: 'outline_generation',
+            previousSteps: [],
+            userInputs: {
+              selectedDirection: '用户体验导向的设计研究',
+              directionDescription: '关注交互体验、使用场景与评价标准'
+            }
+          }
+        })
+      })
+    );
+
+    const text = await new Response(response.body).text();
+
+    expect(text).toContain('《智能服饰交互设计》默认开题大纲');
+    expect(text).toContain('用户体验导向的设计研究');
+    expect(text).toContain('研究设计与实施路径');
     expect(text).toContain('data: [DONE]');
   });
 });
