@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 type ConnectionLightsProps = {
   initialModelConnected: boolean;
   initialWebSearchConnected: boolean;
+  initialPending?: boolean;
   initialModelInfo?: {
     provider: string;
     model: string;
@@ -21,10 +22,12 @@ type StatusResponse = {
 export function ConnectionLights({
   initialModelConnected,
   initialWebSearchConnected,
+  initialPending = false,
   initialModelInfo
 }: ConnectionLightsProps) {
   const [modelConnected, setModelConnected] = useState(initialModelConnected);
   const [webSearchConnected, setWebSearchConnected] = useState(initialWebSearchConnected);
+  const [pending, setPending] = useState(initialPending);
   const [modelInfo, setModelInfo] = useState<{ provider: string; model: string }>(
     initialModelInfo ?? {
       provider: "minimax",
@@ -55,6 +58,7 @@ export function ConnectionLights({
           provider: data.provider || "minimax",
           model: data.model || "MiniMax-M2.7"
         });
+        setPending(false);
       } catch {
         if (cancelled) {
           return;
@@ -62,6 +66,7 @@ export function ConnectionLights({
 
         setModelConnected(false);
         setWebSearchConnected(false);
+        setPending(false);
       }
     }
 
@@ -77,7 +82,9 @@ export function ConnectionLights({
       <div className="status-light">
         <span
           className={
-            modelConnected
+            pending
+              ? "status-light__dot status-light__dot--pending"
+              : modelConnected
               ? "status-light__dot status-light__dot--online"
               : "status-light__dot status-light__dot--offline"
           }
@@ -87,20 +94,22 @@ export function ConnectionLights({
           {modelInfo.model}
         </span>
         <span className="status-light__state">
-          {modelConnected ? "已连通" : "未连通"}
+          {pending ? "探测中" : modelConnected ? "已连通" : "未连通"}
         </span>
       </div>
       <div className="status-light">
         <span
           className={
-            webSearchConnected
+            pending
+              ? "status-light__dot status-light__dot--pending"
+              : webSearchConnected
               ? "status-light__dot status-light__dot--online"
               : "status-light__dot status-light__dot--offline"
           }
         />
         <span>联网搜索</span>
         <span className="status-light__state">
-          {webSearchConnected ? "已连通" : "未连通"}
+          {pending ? "探测中" : webSearchConnected ? "已连通" : "未连通"}
         </span>
       </div>
     </div>

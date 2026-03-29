@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createProject } from "@/lib/server/project-db";
 import { buildProjectCardItem, persistSessionProject, readSessionProjects } from "@/lib/project-session";
 import { authMiddleware, checkPermission } from "@/lib/server/auth-middleware";
+import { getArchivedProjectIds } from "@/lib/server/admin-governance";
 
 export async function POST(request: NextRequest) {
   // 尝试认证（可选）
@@ -123,8 +124,16 @@ export async function GET(request: NextRequest) {
   try {
     const { getProjects } = await import("@/lib/server/project-db");
     const projects = await getProjects();
+    const archivedProjectIds = getArchivedProjectIds();
     const sessionProjects = readSessionProjects(request.cookies);
-    const mergedProjects = [...projects, ...sessionProjects.filter((sessionProject) => !projects.some((project) => project.id === sessionProject.id))];
+    const mergedProjects = [
+      ...projects,
+      ...sessionProjects.filter(
+        (sessionProject) =>
+          !archivedProjectIds.has(sessionProject.id) &&
+          !projects.some((project) => project.id === sessionProject.id)
+      )
+    ];
 
     return NextResponse.json({
       ok: true,

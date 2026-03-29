@@ -2,6 +2,21 @@ import Link from "next/link";
 
 const liveModules = [
   {
+    title: "数据治理与项目恢复",
+    note: "管理归档池、恢复项目，并让主站与后台状态保持一致",
+    href: "/admin/data-governance"
+  },
+  {
+    title: "风险告警",
+    note: "把模型断连、延时过高、审计关闭等问题直接列出来",
+    href: "/admin/risk-alerts"
+  },
+  {
+    title: "成本与容量统计",
+    note: "查看项目、版本、文献和系统模型压力，不再凭感觉猜容量",
+    href: "/admin/capacity"
+  },
+  {
     title: "用户与权限",
     note: "查看账号、切换角色、理解谁能做什么",
     href: "/admin/users"
@@ -39,10 +54,9 @@ const liveModules = [
 ];
 
 const plannedModules = [
-  "数据治理与项目恢复",
-  "风险告警",
-  "真正可执行的自定义角色授权",
-  "成本与容量统计"
+  "资源级授权",
+  "自动备份与一键回滚",
+  "真实账单费用对接"
 ];
 
 export default function AdminOverviewPage() {
@@ -65,12 +79,13 @@ export default function AdminOverviewPage() {
         <section className="content-card atelier-admin-guide-card">
           <div className="atelier-panel__head atelier-panel__head--stack">
             <span className="atelier-kicker">这轮已经补上</span>
-            <h2>为什么现在先做这两块</h2>
+            <h2>为什么这三块现在必须补齐</h2>
           </div>
           <ul className="atelier-bullets">
-            <li>用户与权限，决定超级管理员是否真的能管理“人”。</li>
-            <li>运行诊断，决定管理员能否第一时间看懂“系统为什么不正常”。</li>
-            <li>这两块补齐后，后续再接用户组、审计和系统配置会顺得多。</li>
+            <li>数据治理与项目恢复，决定后台是否真的能管理“项目生命周期”。</li>
+            <li>风险告警，决定管理员能不能第一眼知道系统哪里在冒烟。</li>
+            <li>成本与容量统计，决定系统扩起来之后还能不能看懂负载和体量。</li>
+            <li>自定义角色授权已经接入，不再属于“待补能力”。</li>
           </ul>
         </section>
 

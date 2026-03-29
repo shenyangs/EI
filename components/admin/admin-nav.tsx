@@ -10,6 +10,21 @@ const adminLinks = [
     note: "先看系统状态与待补模块"
   },
   {
+    href: "/admin/data-governance",
+    label: "数据治理",
+    note: "归档、恢复和项目体量管理"
+  },
+  {
+    href: "/admin/risk-alerts",
+    label: "风险告警",
+    note: "把系统风险和优先级收成告警卡"
+  },
+  {
+    href: "/admin/capacity",
+    label: "成本与容量",
+    note: "看系统负载、体量和模型压力"
+  },
+  {
     href: "/admin/users",
     label: "用户与权限",
     note: "管理账号、角色和权限摘要"
@@ -65,8 +80,8 @@ export function AdminNav() {
         );
       })}
       <article className="atelier-admin-nav__item atelier-admin-nav__item--planned">
-        <strong>下一批补齐</strong>
-        <span>数据治理、风险告警、真正接入自定义角色授权</span>
+        <strong>下一批继续</strong>
+        <span>资源级授权、自动备份回滚、真实账单费用对接</span>
       </article>
     </nav>
   );

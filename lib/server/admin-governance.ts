@@ -54,12 +54,24 @@ export type AuditLog = {
   createdAt: string;
 };
 
+export type ArchivedProjectRecord = {
+  projectId: string;
+  title: string;
+  reason: string;
+  archivedAt: string;
+  archivedBy: string;
+  lastKnownUpdatedAt: number;
+  versionCount: number;
+  referenceCount: number;
+};
+
 type GovernanceStore = {
   roleGroups: RoleGroup[];
   customRoles: CustomRoleTemplate[];
   customRoleAssignments: Record<string, string[]>;
   systemConfig: SystemConfig;
   auditLogs: AuditLog[];
+  archivedProjects: ArchivedProjectRecord[];
 };
 
 function createDefaultRoleGroups(): RoleGroup[] {
@@ -178,7 +190,8 @@ function createGovernanceStore(): GovernanceStore {
     customRoles: createDefaultCustomRoles(),
     customRoleAssignments: {},
     systemConfig: createDefaultSystemConfig(),
-    auditLogs: createDefaultAuditLogs()
+    auditLogs: createDefaultAuditLogs(),
+    archivedProjects: []
   };
 }
 
@@ -298,6 +311,42 @@ export function assignCustomRolesToUser(userId: string, roleIds: string[]) {
   const uniqueRoleIds = Array.from(new Set(roleIds.filter(Boolean)));
   adminGovernanceStore.customRoleAssignments[userId] = uniqueRoleIds;
   return uniqueRoleIds;
+}
+
+export function getArchivedProjects() {
+  return [...adminGovernanceStore.archivedProjects].sort(
+    (left, right) => new Date(right.archivedAt).getTime() - new Date(left.archivedAt).getTime()
+  );
+}
+
+export function getArchivedProjectIds() {
+  return new Set(adminGovernanceStore.archivedProjects.map((item) => item.projectId));
+}
+
+export function isProjectArchived(projectId: string) {
+  return adminGovernanceStore.archivedProjects.some((item) => item.projectId === projectId);
+}
+
+export function archiveProjectRecord(input: ArchivedProjectRecord) {
+  const existing = adminGovernanceStore.archivedProjects.find((item) => item.projectId === input.projectId);
+
+  if (existing) {
+    Object.assign(existing, input);
+    return existing;
+  }
+
+  adminGovernanceStore.archivedProjects.unshift(input);
+  return input;
+}
+
+export function restoreArchivedProject(projectId: string) {
+  const index = adminGovernanceStore.archivedProjects.findIndex((item) => item.projectId === projectId);
+  if (index < 0) {
+    return null;
+  }
+
+  const [record] = adminGovernanceStore.archivedProjects.splice(index, 1);
+  return record;
 }
 
 export function getEffectivePermissions(userId: string | undefined, userType: string) {

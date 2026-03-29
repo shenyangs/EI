@@ -1,14 +1,15 @@
 import { ConnectionLights } from "@/components/connection-lights";
-import { getAiStatusPayload } from "@/lib/ai-status";
+import { getAiRuntimeConfig } from "@/lib/ai-runtime";
 
-export async function ConnectionLightsServer() {
-  const status = await getAiStatusPayload();
+export function ConnectionLightsServer() {
+  const runtime = getAiRuntimeConfig();
 
   return (
     <ConnectionLights
-      initialModelConnected={status.canGeneratePaperDraft}
-      initialWebSearchConnected={status.canUseWebSearch}
-      initialModelInfo={{ provider: status.provider, model: status.model }}
+      initialPending
+      initialModelConnected={false}
+      initialWebSearchConnected={false}
+      initialModelInfo={{ provider: runtime.provider, model: runtime.model }}
     />
   );
 }

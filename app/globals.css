@@ -9125,7 +9125,8 @@ a.atelier-text-link {
 
 .status-light__dot,
 .status-light__dot--online,
-.status-light__dot--offline {
+.status-light__dot--offline,
+.status-light__dot--pending {
   width: 8px !important;
   height: 8px !important;
   border-radius: 999px !important;
@@ -9145,6 +9146,11 @@ a.atelier-text-link {
   background: var(--atelier-danger) !important;
   box-shadow: 0 0 0 4px rgba(184, 92, 74, 0.12) !important;
   opacity: 1 !important;
+}
+
+.status-light__dot--pending {
+  background: #c28a2f !important;
+  box-shadow: 0 0 0 4px rgba(194, 138, 47, 0.12) !important;
 }
 
 .status-light__model {
@@ -9366,6 +9372,11 @@ a.atelier-text-link {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
+}
+
+.atelier-admin-actions--stack {
+  display: grid;
+  justify-items: end;
 }
 
 .atelier-admin-grid {
@@ -9835,7 +9846,7 @@ a.atelier-text-link {
 }
 
 .atelier-admin-nav {
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
 }
 
 .atelier-admin-nav__item {

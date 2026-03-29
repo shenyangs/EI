@@ -1,5 +1,6 @@
 import { getDatabase } from './db';
 import type { ProjectVersionPayload } from '@/lib/project-version-types';
+import { getArchivedProjectIds } from '@/lib/server/admin-governance';
 
 export type Project = {
   id: string;
@@ -42,6 +43,13 @@ export async function getProject(id: string) {
 }
 
 export async function getProjects() {
+  const db = await getDatabase();
+  const allProjects = await db.all('SELECT * FROM projects ORDER BY updatedAt DESC') as Project[];
+  const archivedProjectIds = getArchivedProjectIds();
+  return allProjects.filter((project) => !archivedProjectIds.has(project.id));
+}
+
+export async function getAllProjects() {
   const db = await getDatabase();
   return await db.all('SELECT * FROM projects ORDER BY updatedAt DESC') as Project[];
 }

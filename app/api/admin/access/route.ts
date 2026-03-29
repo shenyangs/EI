@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
     baseRoles: roles,
     notes: {
       enforcedNow: '系统基础角色和已分配的附加权限方案，都会立即进入真实权限判断。',
-      stagedNext: '接下来可以继续补用户组批量分配、权限冲突提示和资源级授权。'
+      stagedNext: '下一步重点不是“让它生效”，而是继续补用户组批量分配、权限冲突提示和资源级授权。'
     }
   });
 }

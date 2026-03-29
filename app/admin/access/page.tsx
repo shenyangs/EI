@@ -211,7 +211,7 @@ export default function AdminAccessPage() {
         <section className="content-card atelier-admin-list-card">
             <div className="atelier-panel__head atelier-panel__head--stack">
               <span className="atelier-kicker">自定义角色方案</span>
-              <h2>启用后，就能分配给具体账号</h2>
+              <h2>这块现在已经是真授权，不再只是模板</h2>
               <p>{notes.stagedNext}</p>
             </div>
           <div className="atelier-admin-actions">

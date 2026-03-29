@@ -66,12 +66,19 @@ export async function GET(request: NextRequest) {
         key: 'admin',
         label: '管理员后台',
         state: '已扩展',
-        note: '用户权限、角色方案、审计日志和系统配置都已经接入超管后台。'
+        note: '用户权限、角色方案、审计日志、系统配置、数据治理和风险告警都已经接入超管后台。'
+      },
+      {
+        key: 'custom-roles',
+        label: '自定义角色授权',
+        state: '正常',
+        note: '已启用的附加权限方案会进入真实权限判断，不再只是模板。'
       }
     ],
     plannedModules: [
-      '数据治理',
-      '风险告警'
+      '资源级授权',
+      '自动备份与回滚',
+      '真实账单费用对接'
     ],
     environment: {
       hasMiniMaxKey: readBool(String(aiStatus.hasApiKey)),
