@@ -6,21 +6,19 @@ import { getDefaultModel, probeModelConnection } from "@/lib/ai/ai-client";
 import { getDatabase } from "@/lib/server/db";
 import { isCertificateChainError, requestTextWithCurl as curlRequest } from "@/lib/curl-transport";
 
-// 从环境变量创建默认模型配置
-function createDefaultModelFromEnv(): any {
-  const provider = process.env.AI_PROVIDER || "minimax";
+function createMiniMaxModelFromEnv(): any {
   const model = process.env.MINIMAX_MODEL || "MiniMax-M2.7";
   const baseUrl = process.env.MINIMAX_BASE_URL || "https://api.minimaxi.com/v1";
   const apiKey = process.env.MINIMAX_API_KEY;
-  
+
   if (!apiKey) {
     return null;
   }
-  
+
   return {
     id: 0,
-    name: "默认模型",
-    provider,
+    name: "MiniMax",
+    provider: "minimax",
     model,
     baseUrl,
     apiKey,
@@ -49,6 +47,21 @@ function createGeminiModelFromEnv(): any {
     isDefault: false,
     createdAt: new Date().toISOString()
   };
+}
+
+// 从环境变量创建默认模型配置
+function createDefaultModelFromEnv(): any {
+  const provider = (process.env.AI_PROVIDER || "google").toLowerCase();
+
+  if (provider === "google" || provider === "gemini") {
+    return createGeminiModelFromEnv() || createMiniMaxModelFromEnv();
+  }
+
+  if (provider === "minimax") {
+    return createMiniMaxModelFromEnv() || createGeminiModelFromEnv();
+  }
+
+  return createGeminiModelFromEnv() || createMiniMaxModelFromEnv();
 }
 
 // 测试模型连接（支持环境变量配置）

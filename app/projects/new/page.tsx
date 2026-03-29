@@ -26,6 +26,7 @@ type AiAnalysisResult = {
 };
 
 type AiField = "title" | "subject" | "keywords" | "description";
+type AiDirection = NonNullable<AiAnalysisResult["content"]["metadata"]["directions"]>[number];
 
 type ProjectIdeaInput = {
   title: string;
@@ -145,6 +146,39 @@ function buildLocalAnalysis(input: ProjectIdeaInput): AiAnalysisResult {
   };
 }
 
+function extractKeywordCandidates(text: string) {
+  return text
+    .split(/[\s,，。；;、：:（）()]+/)
+    .map((item) => item.trim())
+    .filter((item) => item.length >= 2 && item.length <= 12);
+}
+
+function buildFieldsFromDirection(direction: AiDirection, input: ProjectIdeaInput) {
+  const titleCore = input.title.trim() || "当前研究主题";
+  const subject = `${direction.label}相关研究对象`;
+  const keywordCandidates = Array.from(
+    new Set([
+      ...extractKeywordCandidates(titleCore),
+      ...extractKeywordCandidates(direction.label),
+      ...extractKeywordCandidates(direction.description),
+      ...extractKeywordCandidates(input.keywords)
+    ])
+  ).slice(0, 5);
+
+  const keywords =
+    keywordCandidates.length > 0
+      ? keywordCandidates.join(", ")
+      : `${titleCore}, ${direction.label}, 研究设计`;
+
+  const description = `本研究拟以“${direction.label}”作为切入方向，围绕“${titleCore}”展开具体研究。重点将放在${direction.description}。在此基础上，进一步明确研究对象、研究方法与应用场景，形成可执行的论文研究方案。`;
+
+  return {
+    subject,
+    keywords,
+    description
+  };
+}
+
 async function requestAiJson<T>(payload: unknown, timeoutMs = 15000, retries = 1): Promise<T> {
   let lastError: unknown;
 
@@ -204,10 +238,12 @@ export default function NewProjectPage() {
   const [venueId, setVenueId] = useState("ieee-iccci-2026");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [applyingDirectionId, setApplyingDirectionId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [aiAnalysis, setAiAnalysis] = useState<AiAnalysisResult | null>(null);
   const analysisRef = useRef<HTMLDivElement | null>(null);
+  const formFieldsRef = useRef<HTMLDivElement | null>(null);
   const aiLockRef = useRef<Record<string, boolean>>({});
 
   useEffect(() => {
@@ -417,6 +453,53 @@ export default function NewProjectPage() {
     }
   }
 
+  function applyDirectionToForm(direction: AiDirection) {
+    setApplyingDirectionId(direction.id);
+    setError("");
+
+    try {
+      const nextValues = buildFieldsFromDirection(direction, {
+        title,
+        subject,
+        keywords,
+        description,
+        venueId
+      });
+
+      const updatedFields: string[] = [];
+
+      if (!subject.trim()) {
+        setSubject(nextValues.subject);
+        updatedFields.push("研究对象");
+      }
+
+      if (!keywords.trim()) {
+        setKeywords(nextValues.keywords);
+        updatedFields.push("关键词");
+      }
+
+      if (!description.trim()) {
+        setDescription(nextValues.description);
+        updatedFields.push("研究描述");
+      }
+
+      if (updatedFields.length === 0) {
+        setNotice("下面几项你已经填过了，这次没有覆盖原内容。你可以手动改，或先清空后再套用这个方向。");
+      } else {
+        setNotice(`已根据“${direction.label}”生成 ${updatedFields.join("、")} 草稿，已填写过的内容保持不变。`);
+      }
+
+      requestAnimationFrame(() => {
+        formFieldsRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "start"
+        });
+      });
+    } finally {
+      setApplyingDirectionId(null);
+    }
+  }
+
   const isAiBusy = isAnalyzing || Object.values(aiFilling).some(Boolean);
 
   return (
@@ -502,7 +585,17 @@ export default function NewProjectPage() {
                       <div className="direction-list">
                         {aiAnalysis.content.metadata.directions.map((direction, index) => (
                           <div key={direction.id} className="direction-item">
-                            <h4>{index + 1}. {direction.label}</h4>
+                            <div className="direction-item__head">
+                              <h4>{index + 1}. {direction.label}</h4>
+                              <button
+                                type="button"
+                                className="secondary-button direction-item__action"
+                                onClick={() => applyDirectionToForm(direction)}
+                                disabled={applyingDirectionId === direction.id}
+                              >
+                                {applyingDirectionId === direction.id ? "生成中..." : "用这个方向填下面"}
+                              </button>
+                            </div>
                             <p>{direction.description}</p>
                             <div className="direction-meta">
                               <span>匹配度: {direction.confidence}/100</span>
@@ -516,7 +609,7 @@ export default function NewProjectPage() {
               </div>
             )}
 
-            <div className="form-group">
+            <div ref={formFieldsRef} className="form-group">
               <label htmlFor="subject">研究对象</label>
               <div className="input-with-button">
                 <input
@@ -690,6 +783,13 @@ export default function NewProjectPage() {
           margin-bottom: 12px;
         }
 
+        .direction-item__head {
+          display: flex;
+          justify-content: space-between;
+          gap: 12px;
+          align-items: flex-start;
+        }
+
         .direction-item h4 {
           margin: 0 0 8px 0;
           color: #333;
@@ -703,6 +803,11 @@ export default function NewProjectPage() {
         .direction-meta {
           font-size: 14px;
           color: #888;
+        }
+
+        .direction-item__action {
+          flex-shrink: 0;
+          white-space: nowrap;
         }
 
         @media (max-width: 900px) {
@@ -721,6 +826,11 @@ export default function NewProjectPage() {
 
           .form-actions {
             justify-content: stretch;
+          }
+
+          .direction-item__head {
+            flex-direction: column;
+            align-items: flex-start;
           }
         }
       `}</style>

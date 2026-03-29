@@ -16,8 +16,8 @@ type Project = ProjectCardItem;
 export default function HomePage() {
   const [selectedPaperType, setSelectedPaperType] = useState<PaperCategory>("ei-conference");
   const [ai, setAi] = useState({
-    provider: "minimax" as const,
-    model: "MiniMax-M2.7",
+    provider: "google" as const,
+    model: "gemini-pro",
     hasApiKey: false,
     webSearchEnabled: true,
     canGeneratePaperDraft: false,

@@ -237,25 +237,23 @@ async function requestModel(
   }
 }
 
-// 从环境变量创建默认模型配置
-function createDefaultModelFromEnv(): AIModel | null {
-  const provider = process.env.AI_PROVIDER || "minimax";
+function createMiniMaxModelFromEnv(): AIModel | null {
   const model = process.env.MINIMAX_MODEL || "MiniMax-M2.7";
   const baseUrl = process.env.MINIMAX_BASE_URL || "https://api.minimaxi.com/v1";
   const apiKey = process.env.MINIMAX_API_KEY;
-  
+
   if (!apiKey) {
     console.warn('MINIMAX_API_KEY is not configured');
   }
-  
+
   if (!apiKey) {
     return null;
   }
-  
+
   return {
     id: 0,
-    name: "默认模型",
-    provider,
+    name: "MiniMax",
+    provider: "minimax",
     model,
     baseUrl,
     apiKey,
@@ -284,6 +282,21 @@ function createGeminiModelFromEnv(): AIModel | null {
     isDefault: false,
     createdAt: new Date().toISOString()
   };
+}
+
+// 从环境变量创建默认模型配置
+function createDefaultModelFromEnv(): AIModel | null {
+  const provider = (process.env.AI_PROVIDER || "google").toLowerCase();
+
+  if (provider === "google" || provider === "gemini") {
+    return createGeminiModelFromEnv() || createMiniMaxModelFromEnv();
+  }
+
+  if (provider === "minimax") {
+    return createMiniMaxModelFromEnv() || createGeminiModelFromEnv();
+  }
+
+  return createGeminiModelFromEnv() || createMiniMaxModelFromEnv();
 }
 
 export async function getDefaultModel(): Promise<AIModel | null> {
@@ -335,7 +348,7 @@ export async function getModelByProvider(provider: string): Promise<AIModel | nu
     console.log(`Using Gemini model from env:`, model ? 'Yes' : 'No');
     return model;
   } else if (provider === 'minimax') {
-    const model = createDefaultModelFromEnv();
+    const model = createMiniMaxModelFromEnv();
     console.log(`Using Minimax model from env:`, model ? 'Yes' : 'No');
     return model;
   }
