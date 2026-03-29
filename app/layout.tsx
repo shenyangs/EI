@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 
-import { ConnectionLights } from "@/components/connection-lights";
+import { ConnectionLightsServer } from "@/components/connection-lights-server";
 import { StitchShellNav } from "@/components/stitch-shell-nav";
 import { AuthNav } from "@/components/auth-nav";
 import SimpleDevTools from "@/components/dev/SimpleDevTools";
+import { ToastProvider } from "@/components/ui/toast";
 import { fallbackStyles } from "@/lib/fallback-styles";
+import { getPublicSystemRuntime } from "@/lib/server/admin-governance";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -18,35 +20,30 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const systemRuntime = getPublicSystemRuntime();
+
   return (
     <html lang="zh-CN">
       <body>
-        <style id="fallback-styles">{fallbackStyles}</style>
-        <div className="ambient ambient--one" />
-        <div className="ambient ambient--two" />
-        <div className="site-frame">
-          <Suspense fallback={null}>
-            <StitchShellNav />
-          </Suspense>
-          <div className="site-stage">
-            <header className="site-topbar">
-              <div className="site-topbar__search">
-                <span>搜索项目代号、会议或章节...</span>
-              </div>
-              <div className="site-topbar__panel">
-                <ConnectionLights
-                  initialModelConnected={false}
-                  initialWebSearchConnected={false}
-                />
-                <AuthNav />
-              </div>
-            </header>
-            <div className="site-shell">{children}</div>
+        <ToastProvider>
+          <style id="fallback-styles">{fallbackStyles}</style>
+          <div className="atelier-shell">
+            <Suspense fallback={null}>
+              <StitchShellNav />
+            </Suspense>
+            <div className="atelier-shell__stage">
+              <header className="atelier-topbar">
+                <div className="atelier-topbar__search">搜索项目代号、会议或章节...</div>
+                <div className="atelier-topbar__panel">
+                  <ConnectionLightsServer />
+                  <AuthNav allowRegistration={systemRuntime.allowRegistration} />
+                </div>
+              </header>
+              <div className="atelier-shell__content">{children}</div>
+            </div>
           </div>
-        </div>
-        
-        {/* 一键超管工具 */}
-        <SimpleDevTools />
+          <SimpleDevTools />
+        </ToastProvider>
       </body>
     </html>
   );

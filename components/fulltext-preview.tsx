@@ -534,6 +534,7 @@ ${section.content.join("\n\n")}`
             actionContext={{
               scope: "fulltext",
               projectId,
+              projectTitle,
               sections: sections.map((section) => ({
                 id: section.id,
                 title: section.title

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDatabase } from '@/lib/server/db';
 import { authMiddleware, checkPermission } from '@/lib/server/auth-middleware';
+import { addAuditLog } from '@/lib/server/admin-governance';
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -10,7 +11,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     const userType = authResponse.headers.get('X-User-Type');
-    if (!userType || !checkPermission(userType, 'ai:update')) {
+    const userId = authResponse.headers.get('X-User-Id') || undefined;
+    if (!userType || !checkPermission(userType, 'ai:update', false, userId)) {
       return NextResponse.json(
         { ok: false, error: '没有权限更新AI模型。' },
         { status: 403 }
@@ -63,6 +65,15 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     );
     
     const models = await db.all('SELECT * FROM ai_models');
+
+    addAuditLog({
+      action: '更新 AI 模型',
+      category: 'AI',
+      severity: '提示',
+      actor: 'super_admin',
+      target: name,
+      detail: `更新模型 ${name} 的连接配置与默认状态。`
+    });
     
     return NextResponse.json({
       ok: true,
@@ -85,7 +96,8 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     }
 
     const userType = authResponse.headers.get('X-User-Type');
-    if (!userType || !checkPermission(userType, 'ai:delete')) {
+    const userId = authResponse.headers.get('X-User-Id') || undefined;
+    if (!userType || !checkPermission(userType, 'ai:delete', false, userId)) {
       return NextResponse.json(
         { ok: false, error: '没有权限删除AI模型。' },
         { status: 403 }
@@ -115,6 +127,15 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     await db.run('DELETE FROM ai_models WHERE id = ?', [id]);
     
     const models = await db.all('SELECT * FROM ai_models');
+
+    addAuditLog({
+      action: '删除 AI 模型',
+      category: 'AI',
+      severity: '高风险',
+      actor: 'super_admin',
+      target: existingModel.name,
+      detail: `删除模型 ${existingModel.name}。`
+    });
     
     return NextResponse.json({
       ok: true,

@@ -6,6 +6,7 @@ import { authMiddleware, checkPermission } from "@/lib/server/auth-middleware";
 export async function POST(request: NextRequest) {
   // 尝试认证（可选）
   let userType = 'student'; // 默认用户类型
+  let userId: string | undefined;
   
   try {
     const authResponse = await authMiddleware(request);
@@ -14,13 +15,14 @@ export async function POST(request: NextRequest) {
       if (authenticatedUserType) {
         userType = authenticatedUserType;
       }
+      userId = authResponse.headers.get('X-User-Id') || undefined;
     }
   } catch (error) {
     // 认证失败，使用默认用户类型
   }
 
   // 检查权限（默认学生用户应该有创建项目的权限）
-  if (!checkPermission(userType, 'project:create')) {
+  if (!checkPermission(userType, 'project:create', false, userId)) {
     return NextResponse.json(
       {
         ok: false,
@@ -107,7 +109,8 @@ export async function GET(request: NextRequest) {
 
   // 检查用户权限
   const userType = authResponse.headers.get('X-User-Type');
-  if (!userType || !checkPermission(userType, 'project:read')) {
+  const userId = authResponse.headers.get('X-User-Id') || undefined;
+  if (!userType || !checkPermission(userType, 'project:read', false, userId)) {
     return NextResponse.json(
       {
         ok: false,

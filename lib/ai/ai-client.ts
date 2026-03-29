@@ -43,6 +43,11 @@ export interface AIModel {
   createdAt: string;
 }
 
+export const SYSTEM_PROVIDER_MODEL_IDS = {
+  minimax: -101,
+  google: -102
+} as const;
+
 type GeneratePaperDraftInput = {
   prompt: string;
   systemPrompt?: string;
@@ -299,6 +304,18 @@ function createDefaultModelFromEnv(): AIModel | null {
   return createGeminiModelFromEnv() || createMiniMaxModelFromEnv();
 }
 
+export function getSystemProviderModel(provider: string): AIModel | null {
+  if (provider === 'google' || provider === 'gemini') {
+    return createGeminiModelFromEnv();
+  }
+
+  if (provider === 'minimax') {
+    return createMiniMaxModelFromEnv();
+  }
+
+  return null;
+}
+
 export async function getDefaultModel(): Promise<AIModel | null> {
   try {
     const db = await getDatabase();
@@ -318,6 +335,14 @@ export async function getModelById(id: number): Promise<AIModel | null> {
   // id为0表示使用环境变量配置
   if (id === 0) {
     return createDefaultModelFromEnv();
+  }
+
+  if (id === SYSTEM_PROVIDER_MODEL_IDS.google) {
+    return getSystemProviderModel('google');
+  }
+
+  if (id === SYSTEM_PROVIDER_MODEL_IDS.minimax) {
+    return getSystemProviderModel('minimax');
   }
   
   try {

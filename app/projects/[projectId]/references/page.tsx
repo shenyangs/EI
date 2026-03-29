@@ -30,7 +30,7 @@ export default async function ReferencesPage({ params }: { params: Promise<{ pro
         </aside>
       </section>
 
-      <ReferencesContent projectId={projectId} />
+      <ReferencesContent projectId={projectId} projectTitle={project.title} />
     </div>
   );
 }

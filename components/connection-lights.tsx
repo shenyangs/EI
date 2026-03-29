@@ -5,6 +5,10 @@ import { useEffect, useState } from "react";
 type ConnectionLightsProps = {
   initialModelConnected: boolean;
   initialWebSearchConnected: boolean;
+  initialModelInfo?: {
+    provider: string;
+    model: string;
+  };
 };
 
 type StatusResponse = {
@@ -16,14 +20,17 @@ type StatusResponse = {
 
 export function ConnectionLights({
   initialModelConnected,
-  initialWebSearchConnected
+  initialWebSearchConnected,
+  initialModelInfo
 }: ConnectionLightsProps) {
   const [modelConnected, setModelConnected] = useState(initialModelConnected);
   const [webSearchConnected, setWebSearchConnected] = useState(initialWebSearchConnected);
-  const [modelInfo, setModelInfo] = useState<{ provider: string; model: string }>({
-    provider: "minimax",
-    model: "MiniMax-M2.7"
-  });
+  const [modelInfo, setModelInfo] = useState<{ provider: string; model: string }>(
+    initialModelInfo ?? {
+      provider: "minimax",
+      model: "MiniMax-M2.7"
+    }
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -79,6 +86,9 @@ export function ConnectionLights({
         <span className="status-light__model">
           {modelInfo.model}
         </span>
+        <span className="status-light__state">
+          {modelConnected ? "已连通" : "未连通"}
+        </span>
       </div>
       <div className="status-light">
         <span
@@ -89,6 +99,9 @@ export function ConnectionLights({
           }
         />
         <span>联网搜索</span>
+        <span className="status-light__state">
+          {webSearchConnected ? "已连通" : "未连通"}
+        </span>
       </div>
     </div>
   );

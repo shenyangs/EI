@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { memoryStore } from '@/lib/server/db';
 import bcrypt from 'bcrypt';
+import { getPublicSystemRuntime } from '@/lib/server/admin-governance';
 
 // 生成唯一ID
 function generateId(): string {
@@ -15,6 +16,11 @@ async function hashPassword(password: string): Promise<string> {
 
 export async function POST(request: NextRequest) {
   try {
+    const systemRuntime = getPublicSystemRuntime();
+    if (!systemRuntime.allowRegistration) {
+      return NextResponse.json({ error: '当前系统已关闭公开注册，请联系管理员开通账号。' }, { status: 403 });
+    }
+
     const { username, email, password, fullName, userType, institution, department } = await request.json();
 
     // 验证必填字段

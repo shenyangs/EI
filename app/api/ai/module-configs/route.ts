@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDatabase } from '@/lib/server/db';
 import { authMiddleware, checkPermission } from '@/lib/server/auth-middleware';
+import { addAuditLog } from '@/lib/server/admin-governance';
+import { getSystemDefaultModelCards } from '@/lib/ai-status';
+import { SYSTEM_PROVIDER_MODEL_IDS } from '@/lib/ai/ai-client';
 
 interface AiModuleConfig {
   id?: number;
@@ -14,13 +17,13 @@ interface AiModuleConfig {
 
 // 定义AI功能模块
 const AI_MODULES = [
-  { key: 'direction', name: '研究方向生成', description: '为用户提供研究方向建议' },
-  { key: 'topic_analysis', name: '主题分析', description: '分析和拆解研究主题' },
-  { key: 'content_generation', name: '内容生成', description: '生成章节和正文内容' },
-  { key: 'review', name: '稿件评审', description: '对稿件进行质量评估和改进建议' },
-  { key: 'revision', name: '改稿建议', description: '提供具体的修改建议' },
-  { key: 'paper_guidance', name: '论文指导', description: '提供论文写作指导' },
-  { key: 'think', name: 'AI思考', description: '深度思考和任务编排' }
+  { key: 'direction', name: '研究方向生成', description: '为用户提供研究方向建议', systemPreset: 'Gemini 优先' },
+  { key: 'topic_analysis', name: '主题分析', description: '分析和拆解研究主题', systemPreset: 'Gemini 优先' },
+  { key: 'content_generation', name: '内容生成', description: '生成章节和正文内容', systemPreset: 'MiniMax 优先' },
+  { key: 'review', name: '稿件评审', description: '对稿件进行质量评估和改进建议', systemPreset: 'Gemini 优先' },
+  { key: 'revision', name: '改稿建议', description: '提供具体的修改建议', systemPreset: 'MiniMax 优先' },
+  { key: 'paper_guidance', name: '论文指导', description: '提供论文写作指导', systemPreset: 'Gemini 优先' },
+  { key: 'think', name: 'AI思考', description: '深度思考和任务编排', systemPreset: 'Gemini 优先' }
 ];
 
 export async function GET(request: NextRequest) {
@@ -31,7 +34,8 @@ export async function GET(request: NextRequest) {
     }
 
     const userType = authResponse.headers.get('X-User-Type');
-    if (!userType || !checkPermission(userType, 'ai:read')) {
+    const userId = authResponse.headers.get('X-User-Id') || undefined;
+    if (!userType || !checkPermission(userType, 'ai:read', false, userId)) {
       return NextResponse.json(
         { ok: false, error: '没有权限查看模块配置。' },
         { status: 403 }
@@ -41,6 +45,7 @@ export async function GET(request: NextRequest) {
     const db = await getDatabase();
     const configs = await db.all('SELECT * FROM ai_module_configs');
     const models = await db.all('SELECT * FROM ai_models');
+    const systemModels = getSystemDefaultModelCards();
     
     // 合并默认模块和已有配置
     const result = AI_MODULES.map(module => {
@@ -56,7 +61,14 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       ok: true,
       modules: result,
-      models
+      models,
+      systemModels,
+      modelSwitchOptions: [
+        { key: 'system', label: '跟随系统预置', modelId: null, useAutomatic: true },
+        { key: 'gemini', label: '固定走 Gemini', modelId: SYSTEM_PROVIDER_MODEL_IDS.google, useAutomatic: false },
+        { key: 'minimax', label: '固定走 MiniMax', modelId: SYSTEM_PROVIDER_MODEL_IDS.minimax, useAutomatic: false },
+        { key: 'custom', label: '固定走自定义模型', modelId: null, useAutomatic: false }
+      ]
     });
   } catch (error) {
     console.error('Failed to fetch module configs:', error);
@@ -75,7 +87,8 @@ export async function PUT(request: NextRequest) {
     }
 
     const userType = authResponse.headers.get('X-User-Type');
-    if (!userType || !checkPermission(userType, 'ai:update')) {
+    const userId = authResponse.headers.get('X-User-Id') || undefined;
+    if (!userType || !checkPermission(userType, 'ai:update', false, userId)) {
       return NextResponse.json(
         { ok: false, error: '没有权限更新模块配置。' },
         { status: 403 }
@@ -109,6 +122,15 @@ export async function PUT(request: NextRequest) {
         [null, moduleKey, moduleInfo?.name || moduleKey, modelId, useAutomatic ? 1 : 0, now, now]
       );
     }
+
+    addAuditLog({
+      action: '更新 AI 模块分配',
+      category: 'AI',
+      severity: '提示',
+      actor: 'super_admin',
+      target: moduleKey,
+      detail: `${moduleKey} 已切换为${useAutomatic ? '跟随系统预置' : modelId === SYSTEM_PROVIDER_MODEL_IDS.google ? '固定 Gemini' : modelId === SYSTEM_PROVIDER_MODEL_IDS.minimax ? '固定 MiniMax' : `固定自定义模型 ${modelId ?? '未指定'}`}。`
+    });
 
     return NextResponse.json({ ok: true });
   } catch (error) {

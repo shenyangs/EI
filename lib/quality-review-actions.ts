@@ -6,6 +6,7 @@ export type ReviewActionScope = "outline" | "chapter" | "fulltext";
 export type ReviewActionContext = {
   scope: ReviewActionScope;
   projectId: string;
+  projectTitle?: string;
   venueId?: string | null;
   activeChapterId?: string;
   sections?: Array<{
@@ -161,6 +162,19 @@ function labelWithoutPrefix(label: string) {
   return label.replace(/^去/, "");
 }
 
+function buildReferenceSearchQuery(issue: ReviewIssue, context: ReviewActionContext) {
+  const chapterId = inferChapterId(issue, context);
+  const sectionTitle =
+    context.sections?.find((section) => section.id === chapterId)?.title ||
+    context.sections?.find((section) => normalizeIssueText(issue).includes(section.title.toLowerCase()))?.title;
+
+  const parts = [context.projectTitle, sectionTitle, issue.dimension]
+    .map((item) => item?.trim())
+    .filter(Boolean);
+
+  return parts.join(" ");
+}
+
 function labelForIssue(issue: ReviewIssue, scope: ReviewActionScope) {
   const text = normalizeIssueText(issue);
 
@@ -289,6 +303,21 @@ export function getReviewAction(issue: ReviewIssue, context: ReviewActionContext
   }
 
   const chapterId = inferChapterId(issue, context);
+
+  if (isEvidenceIssue(issue)) {
+    return {
+      href: buildProjectHref(context, `/projects/${context.projectId}/references`, {
+        query: {
+          tab: "references",
+          mode: "search",
+          autoSearch: "1",
+          q: buildReferenceSearchQuery(issue, context)
+        }
+      }),
+      label: labelForIssue(issue, context.scope),
+      reason: chapterId ? `${issue.dimension} -> references (${chapterId})` : `${issue.dimension} -> references`
+    };
+  }
 
   return {
     href: buildProjectHref(context, `/projects/${context.projectId}/writing`, {

@@ -65,7 +65,15 @@ type ChapterWritingStudioProps = {
   checks: CheckItem[];
   initialChapterId: string | undefined;
   venueId: string | undefined;
+  aiAutoFillEnabled: boolean;
 };
+
+function describeQualityScore(score: number) {
+  if (score >= 90) return "扎实";
+  if (score >= 75) return "可提交";
+  if (score >= 60) return "待补强";
+  return "需重写";
+}
 
 export function ChapterWritingStudio({
   projectId,
@@ -76,7 +84,8 @@ export function ChapterWritingStudio({
   assets,
   checks,
   initialChapterId,
-  venueId
+  venueId,
+  aiAutoFillEnabled
 }: ChapterWritingStudioProps) {
   const [activeChapterId, setActiveChapterId] = useState(initialChapterId || chapters[0]?.id || "");
   const [, setActiveParagraphIndex] = useState(0);
@@ -103,6 +112,10 @@ export function ChapterWritingStudio({
   // 生成章节内容
   async function generateChapterContent() {
     if (!activeChapter) return;
+    if (!aiAutoFillEnabled) {
+      setMessage("当前系统已关闭 AI 自动补全。你仍然可以手动编辑这一章。");
+      return;
+    }
 
     startTransition(async () => {
       setIsGenerating(true);
@@ -156,6 +169,10 @@ export function ChapterWritingStudio({
   // 重新生成当前章节
   async function regenerateCurrentChapter() {
     if (!activeChapter) return;
+    if (!aiAutoFillEnabled) {
+      setMessage("当前系统已关闭 AI 自动补全，暂时不能自动重写章节。");
+      return;
+    }
 
     startTransition(async () => {
       setIsGenerating(true);
@@ -211,6 +228,11 @@ export function ChapterWritingStudio({
   async function applyCustomInstruction() {
     if (!customInstruction.trim()) {
       setMessage("先写一句你的修改要求，再让 AI 按这个方向改。");
+      return;
+    }
+
+    if (!aiAutoFillEnabled) {
+      setMessage("当前系统已关闭 AI 自动补全，暂时不能按指令自动改写。");
       return;
     }
 
@@ -435,11 +457,15 @@ ${content}
         </div>
         <div className="hint-panel">
           <strong>AI 当前可帮你做的事</strong>
-          <ul className="bullet-list">
-            {(activeChapter?.aiOptions ?? []).map((item) => (
-              <li key={item}>{item}</li>
-            ))}
-          </ul>
+          {aiAutoFillEnabled ? (
+            <ul className="bullet-list">
+              {(activeChapter?.aiOptions ?? []).map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          ) : (
+            <p>当前系统已关闭 AI 自动补全。本页仍保留人工写作、段落编辑和质量检查。</p>
+          )}
         </div>
       </aside>
 
@@ -471,10 +497,10 @@ ${content}
             <button
               className="primary-button"
               onClick={generateChapterContent}
-              disabled={isGenerating}
+              disabled={isGenerating || !aiAutoFillEnabled}
               type="button"
             >
-              {isGenerating ? "生成中..." : "AI 生成章节内容"}
+              {!aiAutoFillEnabled ? "AI 自动补全已关闭" : isGenerating ? "生成中..." : "AI 生成章节内容"}
             </button>
           </div>
         ) : (
@@ -550,10 +576,10 @@ ${content}
               <button
                 className="secondary-button"
                 onClick={regenerateCurrentChapter}
-                disabled={isGenerating}
+                disabled={isGenerating || !aiAutoFillEnabled}
                 type="button"
               >
-                {isGenerating ? "重新生成中..." : "重新生成章节"}
+                {!aiAutoFillEnabled ? "AI 自动补全已关闭" : isGenerating ? "重新生成中..." : "重新生成章节"}
               </button>
               <button
                 className="primary-button"
@@ -583,10 +609,10 @@ ${content}
               <button
                 className="secondary-button"
                 onClick={applyCustomInstruction}
-                disabled={!customInstruction.trim()}
+                disabled={!customInstruction.trim() || !aiAutoFillEnabled}
                 type="button"
               >
-                按要求修改
+                {aiAutoFillEnabled ? "按要求修改" : "AI 自动补全已关闭"}
               </button>
             </div>
           </div>
@@ -677,7 +703,7 @@ ${content}
             >
               <div className="analysis-scorecard__head">
                 <strong>整体评分</strong>
-                <span>{aiAnalysisMap[activeChapterId].quality.overallScore}/100</span>
+                <span>{describeQualityScore(aiAnalysisMap[activeChapterId].quality.overallScore)}</span>
               </div>
               <span
                 className={
@@ -695,7 +721,7 @@ ${content}
                 <div key={criterion.name} className="criterion">
                   <div className="criterion__head">
                     <span>{criterion.name}</span>
-                    <span>{criterion.score}/100</span>
+                    <span>{describeQualityScore(criterion.score)}</span>
                   </div>
                   <div className="progress-bar">
                     <div

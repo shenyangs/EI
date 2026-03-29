@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { setAuthToken, setUserInfo } from "@/lib/auth";
+import { defaultPublicSystemConfig, fetchPublicSystemConfig } from "@/lib/client/public-system";
 
 interface LoginFormData {
   email: string;
@@ -20,6 +21,13 @@ export default function LoginPage() {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [allowRegistration, setAllowRegistration] = useState(defaultPublicSystemConfig.allowRegistration);
+
+  useEffect(() => {
+    void fetchPublicSystemConfig()
+      .then((config) => setAllowRegistration(config.allowRegistration))
+      .catch(() => setAllowRegistration(true));
+  }, []);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
@@ -143,11 +151,15 @@ export default function LoginPage() {
           </button>
 
           <div className="auth-footer">
-            <p>还没有账号？
-              <Link href="/register" className="auth-link">
-                立即注册
-              </Link>
-            </p>
+            {allowRegistration ? (
+              <p>还没有账号？
+                <Link href="/register" className="auth-link">
+                  立即注册
+                </Link>
+              </p>
+            ) : (
+              <p>当前系统已关闭公开注册，请联系管理员开通账号。</p>
+            )}
           </div>
         </form>
       </div>

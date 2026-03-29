@@ -2,12 +2,30 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
-import { ProgressStrip } from "@/components/progress-strip";
 import { ProjectNav } from "@/components/project-nav";
 import { StatusBadge } from "@/components/status-badge";
 import { VenueHeaderInfo } from "@/components/venue-header-info";
-import { getAiCapabilitySnapshot } from "@/lib/ai-runtime";
 import { getProjectViewById } from "@/lib/project-view";
+
+function describeProgress(value: number) {
+  if (value >= 100) {
+    return { status: "已完成", note: "当前阶段已经锁定" };
+  }
+
+  if (value >= 80) {
+    return { status: "已成型", note: "可以继续向下推进" };
+  }
+
+  if (value >= 50) {
+    return { status: "推进中", note: "当前主线正在处理" };
+  }
+
+  if (value > 0) {
+    return { status: "已启动", note: "基础已经建立" };
+  }
+
+  return { status: "待开始", note: "等前一步完成后开启" };
+}
 
 export default async function ProjectLayout({
   children,
@@ -18,73 +36,54 @@ export default async function ProjectLayout({
 }) {
   const { projectId } = await params;
   const project = await getProjectViewById(projectId);
-  const ai = getAiCapabilitySnapshot();
 
   if (!project) {
     notFound();
   }
 
   return (
-    <main className="project-shell">
-      <section className="project-summary project-summary--scholarly">
-        <div className="project-summary__top">
-          <Link className="sidebar-home" href="/">
-            返回项目首页
-          </Link>
-          <StatusBadge tone="amber">{project.stage}</StatusBadge>
-        </div>
-        <div className="project-summary__body">
-          <div className="project-summary__copy">
-            <span className="eyebrow">当前项目</span>
-            <h1>{project.title}</h1>
-            <p>{project.subtitle}</p>
+    <main className="atelier-project-shell">
+      <section className="atelier-project-masthead">
+        <div className="atelier-project-masthead__main">
+          <div className="atelier-project-masthead__top">
+            <Link className="atelier-text-link" href="/">
+              返回项目首页
+            </Link>
+            <StatusBadge tone="amber">{project.stage}</StatusBadge>
           </div>
-          <div className="hero-actions project-summary__signals">
-            <span className="ghost-chip">研究方向已绑定</span>
-            <span className="ghost-chip">结构可继续细化</span>
-            <span className="ghost-chip">文献与证据可独立整理</span>
-            <span className="ghost-chip ghost-chip--accent">
-              {ai.canUseWebSearch ? "联网检索可用" : "联网检索待接入"}
-            </span>
-          </div>
+          <span className="atelier-kicker">当前项目</span>
+          <h1>{project.title}</h1>
+          <p>{project.subtitle}</p>
         </div>
-        <div className="project-hero project-hero--scholarly">
-          <div className="project-hero__copy">
-            <Suspense fallback={null}>
-              <VenueHeaderInfo />
-            </Suspense>
-          </div>
-          <div className="project-summary__note">
-            <span className="eyebrow">当前操作原则</span>
-            <p>先完成当前步骤，再进入下一步。项目页负责判断方向是否正确，不让用户在错误阶段做太多事。</p>
-          </div>
-        </div>
-        <div className="progress-card">
-          {project.progress.map((item) => (
-            <ProgressStrip key={item.label} label={item.label} value={item.value} />
-          ))}
-        </div>
-      </section>
 
-      <section className="project-main">
-        <section className="content-card content-card--soft project-nav-shell">
-          <div className="card-heading card-heading--stack">
-            <span className="eyebrow">流程导航</span>
-            <h3>研究流程导航（6 步）</h3>
-            <p>首页、项目页、写作页和文献页都围着同一条主线走，不让用户在不同页面学两套逻辑。</p>
-          </div>
+        <aside className="atelier-project-masthead__rail">
           <Suspense fallback={null}>
-            <ProjectNav projectId={project.id} />
+            <VenueHeaderInfo />
           </Suspense>
-        </section>
-        {children}
+        </aside>
       </section>
 
-      <div className="mobile-project-dock" aria-hidden="false">
+      <section className="atelier-project-ribbon">
+        {project.progress.map((item) => {
+          const detail = describeProgress(item.value);
+
+          return (
+            <article key={item.label} className="atelier-project-ribbon__item">
+              <span>{item.label}</span>
+              <strong>{detail.status}</strong>
+              <small>{detail.note}</small>
+            </article>
+          );
+        })}
+      </section>
+
+      <section className="atelier-project-navwrap">
         <Suspense fallback={null}>
-          <ProjectNav projectId={project.id} variant="dock" />
+          <ProjectNav projectId={project.id} />
         </Suspense>
-      </div>
+      </section>
+
+      <div className="atelier-project-content">{children}</div>
     </main>
   );
 }

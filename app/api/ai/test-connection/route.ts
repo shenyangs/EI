@@ -187,7 +187,8 @@ export async function POST(request: NextRequest) {
     }
 
     const userType = authResponse.headers.get('X-User-Type');
-    if (!userType || !checkPermission(userType, 'ai:read')) {
+    const userId = authResponse.headers.get('X-User-Id') || undefined;
+    if (!userType || !checkPermission(userType, 'ai:read', false, userId)) {
       return NextResponse.json(
         { ok: false, error: '没有权限测试模型连接。' },
         { status: 403 }
@@ -232,6 +233,8 @@ export async function POST(request: NextRequest) {
       endpoint = `${baseUrl.replace(/\/$/, '')}/chat/completions`;
     }
 
+    const startedAt = Date.now();
+
     const data = await requestModel(endpoint, apiKey, {
       model: modelName,
       temperature: 0,
@@ -254,13 +257,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         ok: true,
         success: true,
-        message: '连接成功'
+        message: '连接成功',
+        latencyMs: Date.now() - startedAt
       });
     } else {
       return NextResponse.json({
         ok: true,
         success: false,
-        error: '连接成功但未收到响应内容'
+        error: '连接成功但未收到响应内容',
+        latencyMs: Date.now() - startedAt
       });
     }
   } catch (error) {

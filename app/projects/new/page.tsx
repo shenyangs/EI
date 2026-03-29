@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { VenueRuleSelector } from "@/components/venue-rule-selector";
+import { defaultPublicSystemConfig, fetchPublicSystemConfig, type PublicSystemConfig } from "@/lib/client/public-system";
 
 type AiAnalysisResult = {
   ok: boolean;
@@ -35,6 +36,13 @@ type ProjectIdeaInput = {
   description: string;
   venueId: string;
 };
+
+function describeDirectionConfidence(value: number) {
+  if (value >= 90) return "高度匹配";
+  if (value >= 75) return "适合推进";
+  if (value >= 60) return "可作参考";
+  return "还需收敛";
+}
 
 function getFriendlyAiErrorMessage(error: unknown) {
   const message = error instanceof Error ? error.message : "AI 分析失败";
@@ -243,6 +251,7 @@ export default function NewProjectPage() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [aiAnalysis, setAiAnalysis] = useState<AiAnalysisResult | null>(null);
+  const [systemConfig, setSystemConfig] = useState<PublicSystemConfig>(defaultPublicSystemConfig);
   const analysisRef = useRef<HTMLDivElement | null>(null);
   const formFieldsRef = useRef<HTMLDivElement | null>(null);
   const aiLockRef = useRef<Record<string, boolean>>({});
@@ -258,7 +267,18 @@ export default function NewProjectPage() {
     });
   }, [aiAnalysis]);
 
+  useEffect(() => {
+    void fetchPublicSystemConfig()
+      .then((config) => setSystemConfig(config))
+      .catch(() => setSystemConfig(defaultPublicSystemConfig));
+  }, []);
+
   async function analyzeWithAi() {
+    if (!systemConfig.aiAutoFillEnabled) {
+      setNotice("当前系统已关闭 AI 自动补全，你可以先手动整理研究主题。");
+      return;
+    }
+
     setIsAnalyzing(true);
     setError("");
     setNotice("");
@@ -306,6 +326,11 @@ export default function NewProjectPage() {
   }
 
   async function fillWithAi(field: AiField, currentValue: string) {
+    if (!systemConfig.aiAutoFillEnabled) {
+      setNotice("当前系统已关闭 AI 自动补全，你可以继续手动填写。");
+      return;
+    }
+
     if (aiLockRef.current[field]) {
       return;
     }
@@ -389,6 +414,11 @@ export default function NewProjectPage() {
   }
 
   async function fillAllWithAi() {
+    if (!systemConfig.aiAutoFillEnabled) {
+      setNotice("当前系统已关闭 AI 自动补全，你可以继续手动填写。");
+      return;
+    }
+
     if (!title.trim()) {
       setError("请先输入研究主题");
       return;
@@ -518,6 +548,7 @@ export default function NewProjectPage() {
   }
 
   const isAiBusy = isAnalyzing || Object.values(aiFilling).some(Boolean);
+  const aiAssistDisabled = !systemConfig.aiAutoFillEnabled;
 
   return (
     <main className="page-main">
@@ -550,9 +581,9 @@ export default function NewProjectPage() {
                   type="button"
                   className="secondary-button"
                   onClick={() => fillWithAi("title", title)}
-                  disabled={aiFilling.title}
+                  disabled={aiFilling.title || aiAssistDisabled}
                 >
-                  {aiFilling.title ? "AI 填写中..." : "AI 填写"}
+                  {aiAssistDisabled ? "AI 已关闭" : aiFilling.title ? "AI 填写中..." : "AI 填写"}
                 </button>
               </div>
             </div>
@@ -567,19 +598,22 @@ export default function NewProjectPage() {
                   type="button"
                   className="secondary-button"
                   onClick={analyzeWithAi}
-                  disabled={isAiBusy || !title.trim()}
+                  disabled={isAiBusy || aiAssistDisabled || !title.trim()}
                 >
-                  {isAnalyzing ? "AI 分析中..." : "AI 分析我的想法"}
+                  {aiAssistDisabled ? "AI 分析已关闭" : isAnalyzing ? "AI 分析中..." : "AI 分析我的想法"}
                 </button>
                 <button
                   type="button"
                   className="secondary-button"
                   onClick={fillAllWithAi}
-                  disabled={isAiBusy || !title.trim()}
+                  disabled={isAiBusy || aiAssistDisabled || !title.trim()}
                 >
-                  {Object.values(aiFilling).some(Boolean) ? "AI 补全中..." : "AI 一键补全其余内容"}
+                  {aiAssistDisabled ? "AI 补全已关闭" : Object.values(aiFilling).some(Boolean) ? "AI 补全中..." : "AI 一键补全其余内容"}
                 </button>
               </div>
+              {aiAssistDisabled ? (
+                <p className="atelier-inline-note">当前系统已由超级管理员关闭 AI 自动补全。你仍然可以手动填写项目内容。</p>
+              ) : null}
             </div>
 
             {aiAnalysis && (
@@ -615,7 +649,7 @@ export default function NewProjectPage() {
                             </div>
                             <p>{direction.description}</p>
                             <div className="direction-meta">
-                              <span>匹配度: {direction.confidence}/100</span>
+                              <span>建议强度：{describeDirectionConfidence(direction.confidence)}</span>
                             </div>
                           </div>
                         ))}
@@ -640,9 +674,9 @@ export default function NewProjectPage() {
                   type="button"
                   className="secondary-button"
                   onClick={() => fillWithAi("subject", subject)}
-                  disabled={aiFilling.subject}
+                  disabled={aiFilling.subject || aiAssistDisabled}
                 >
-                  {aiFilling.subject ? "AI 填写中..." : "AI 填写"}
+                  {aiAssistDisabled ? "AI 已关闭" : aiFilling.subject ? "AI 填写中..." : "AI 填写"}
                 </button>
               </div>
             </div>
@@ -661,9 +695,9 @@ export default function NewProjectPage() {
                   type="button"
                   className="secondary-button"
                   onClick={() => fillWithAi("keywords", keywords)}
-                  disabled={aiFilling.keywords}
+                  disabled={aiFilling.keywords || aiAssistDisabled}
                 >
-                  {aiFilling.keywords ? "AI 填写中..." : "AI 填写"}
+                  {aiAssistDisabled ? "AI 已关闭" : aiFilling.keywords ? "AI 填写中..." : "AI 填写"}
                 </button>
               </div>
             </div>
@@ -682,9 +716,9 @@ export default function NewProjectPage() {
                   type="button"
                   className="secondary-button"
                   onClick={() => fillWithAi("description", description)}
-                  disabled={aiFilling.description}
+                  disabled={aiFilling.description || aiAssistDisabled}
                 >
-                  {aiFilling.description ? "AI 填写中..." : "AI 填写"}
+                  {aiAssistDisabled ? "AI 已关闭" : aiFilling.description ? "AI 填写中..." : "AI 填写"}
                 </button>
               </div>
             </div>
@@ -726,9 +760,9 @@ export default function NewProjectPage() {
           align-items: center;
           gap: 16px;
           padding: 18px 20px;
-          border-radius: 20px;
-          background: rgba(248, 251, 255, 0.92);
-          border: 1px solid rgba(214, 225, 243, 0.95);
+          border-radius: 0;
+          background: #faf8f1;
+          border: 1px solid #cfc8b8;
           grid-column: 1 / -1;
         }
 
@@ -739,7 +773,7 @@ export default function NewProjectPage() {
 
         .ai-assist-copy p {
           margin: 0;
-          color: #60738d;
+          color: #677180;
         }
 
         .ai-assist-actions {
@@ -749,13 +783,20 @@ export default function NewProjectPage() {
           justify-content: flex-end;
         }
 
+        .ai-assist-actions :global(.secondary-button),
+        .direction-item__action {
+          border-color: #cfc8b8;
+          background: #ebe7dc;
+          color: #1b2430;
+        }
+
         .ai-analysis-panel {
           display: grid;
           gap: 16px;
           padding: 20px;
-          border-radius: 24px;
-          background: rgba(255, 255, 255, 0.9);
-          border: 1px solid rgba(214, 225, 243, 0.95);
+          border-radius: 0;
+          background: #faf8f1;
+          border: 1px solid #cfc8b8;
           grid-column: 1 / -1;
         }
 
@@ -779,10 +820,10 @@ export default function NewProjectPage() {
         .form-notice {
           grid-column: 1 / -1;
           padding: 14px 16px;
-          border-radius: 16px;
-          background: rgba(238, 247, 255, 0.92);
-          border: 1px solid rgba(163, 200, 255, 0.55);
-          color: #35537e;
+          border-radius: 0;
+          background: #ebe7dc;
+          border: 1px solid #cfc8b8;
+          color: #1b2430;
         }
 
         .form-notice p {
@@ -794,9 +835,10 @@ export default function NewProjectPage() {
         }
 
         .direction-item {
-          background: #f8f9fa;
+          background: #faf8f1;
           padding: 16px;
-          border-radius: 8px;
+          border-radius: 0;
+          border: 1px solid #cfc8b8;
           margin-bottom: 12px;
         }
 
@@ -809,17 +851,17 @@ export default function NewProjectPage() {
 
         .direction-item h4 {
           margin: 0 0 8px 0;
-          color: #333;
+          color: #1b2430;
         }
 
         .direction-item p {
           margin: 0 0 8px 0;
-          color: #666;
+          color: #677180;
         }
 
         .direction-meta {
           font-size: 14px;
-          color: #888;
+          color: #677180;
         }
 
         .direction-item__action {

@@ -6,14 +6,22 @@ import { ReferenceManager, type Reference, type ReferenceFilter } from "@/lib/re
 
 type ReferenceManagerProps = {
   projectId: string;
+  initialQuery?: string;
+  autoSearch?: boolean;
+  initialViewMode?: ViewMode;
 };
 
 type ViewMode = "list" | "search" | "import" | "detail";
 
-export function ReferenceManagerPanel({ projectId }: ReferenceManagerProps) {
+export function ReferenceManagerPanel({
+  projectId,
+  initialQuery = "",
+  autoSearch = false,
+  initialViewMode = "list"
+}: ReferenceManagerProps) {
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [references, setReferences] = useState<Reference[]>([]);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState(initialQuery);
   const [searchResults, setSearchResults] = useState<Reference[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [selectedReference, setSelectedReference] = useState<Reference | null>(null);
@@ -37,27 +45,41 @@ export function ReferenceManagerPanel({ projectId }: ReferenceManagerProps) {
     loadReferences();
   }, [loadReferences]);
 
-  const handleSearch = async () => {
-    if (!searchQuery.trim()) return;
+  useEffect(() => {
+    setViewMode(initialViewMode);
+  }, [initialViewMode]);
+
+  const handleSearch = useCallback(async (overrideQuery?: string) => {
+    const nextQuery = (overrideQuery ?? searchQuery).trim();
+    if (!nextQuery) return;
 
     setIsSearching(true);
     setMessage("正在搜索学术文献...");
 
     try {
-      const result = await ReferenceManager.searchReferences(searchQuery, {
+      const result = await ReferenceManager.searchReferences(nextQuery, {
         filter,
         page: 1,
         pageSize: 10
       });
 
       setSearchResults(result.references);
+      setSearchQuery(nextQuery);
       setMessage(`找到 ${result.total} 篇相关文献`);
     } catch (error) {
       setMessage("搜索失败，请稍后重试");
     } finally {
       setIsSearching(false);
     }
-  };
+  }, [filter, searchQuery]);
+
+  useEffect(() => {
+    if (!autoSearch || !initialQuery.trim()) {
+      return;
+    }
+
+    void handleSearch(initialQuery);
+  }, [autoSearch, handleSearch, initialQuery]);
 
   const handleAddReference = async (reference: Omit<Reference, "id" | "addedAt">) => {
     try {
@@ -141,7 +163,7 @@ export function ReferenceManagerPanel({ projectId }: ReferenceManagerProps) {
             onChange={(e) => setSearchQuery(e.target.value)}
             onKeyPress={(e) => e.key === "Enter" && handleSearch()}
           />
-          <button onClick={handleSearch} className="secondary-button">
+          <button onClick={() => void handleSearch()} className="secondary-button">
             搜索
           </button>
         </div>
@@ -220,11 +242,11 @@ export function ReferenceManagerPanel({ projectId }: ReferenceManagerProps) {
           placeholder="输入关键词搜索学术文献..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          onKeyPress={(e) => e.key === "Enter" && handleSearch()}
+          onKeyPress={(e) => e.key === "Enter" && void handleSearch()}
           className="search-input"
         />
         <button
-          onClick={handleSearch}
+          onClick={() => void handleSearch()}
           disabled={isSearching}
           className="primary-button"
         >

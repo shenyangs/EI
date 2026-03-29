@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { memoryStore } from './db';
 import { validateToken } from '@/lib/jwt';
+import { hasEffectivePermission } from './admin-governance';
 import {
   applyCorsHeaders,
   applySecurityHeaders,
@@ -111,119 +112,13 @@ export async function optionalAuthMiddleware(request: NextRequest) {
 }
 
 // 角色权限检查
-export function checkPermission(userType: string, requiredPermission: string, isSuperAdmin = false): boolean {
-  // 超管拥有所有权限
-  if (isSuperAdmin) {
-    return true;
-  }
-  
-  // 权限映射表
-  const permissions: Record<string, Record<string, boolean>> = {
-    student: {
-      'project:create': true,
-      'project:read': true,
-      'project:update': true,
-      'project:delete': false,
-      'project:share': false,
-      'ai:create': false,
-      'ai:read': true,
-      'ai:update': false,
-      'ai:delete': false,
-      'user:create': false,
-      'user:read': false,
-      'user:update': false,
-      'user:delete': false,
-      'system:read': false,
-      'system:update': false
-    },
-    lecturer: {
-      'project:create': true,
-      'project:read': true,
-      'project:update': true,
-      'project:delete': true,
-      'project:share': true,
-      'ai:create': true,
-      'ai:read': true,
-      'ai:update': true,
-      'ai:delete': false,
-      'user:create': false,
-      'user:read': false,
-      'user:update': false,
-      'user:delete': false,
-      'system:read': false,
-      'system:update': false
-    },
-    associate_professor: {
-      'project:create': true,
-      'project:read': true,
-      'project:update': true,
-      'project:delete': true,
-      'project:share': true,
-      'ai:create': true,
-      'ai:read': true,
-      'ai:update': true,
-      'ai:delete': true,
-      'user:create': false,
-      'user:read': false,
-      'user:update': false,
-      'user:delete': false,
-      'system:read': false,
-      'system:update': false
-    },
-    professor: {
-      'project:create': true,
-      'project:read': true,
-      'project:update': true,
-      'project:delete': true,
-      'project:share': true,
-      'ai:create': true,
-      'ai:read': true,
-      'ai:update': true,
-      'ai:delete': true,
-      'user:create': false,
-      'user:read': true,
-      'user:update': false,
-      'user:delete': false,
-      'system:read': false,
-      'system:update': false
-    },
-    advisor: {
-      'project:create': true,
-      'project:read': true,
-      'project:update': true,
-      'project:delete': true,
-      'project:share': true,
-      'ai:create': true,
-      'ai:read': true,
-      'ai:update': true,
-      'ai:delete': true,
-      'user:create': true,
-      'user:read': true,
-      'user:update': true,
-      'user:delete': false,
-      'system:read': false,
-      'system:update': false
-    },
-    admin: {
-      'project:create': true,
-      'project:read': true,
-      'project:update': true,
-      'project:delete': true,
-      'project:share': true,
-      'ai:create': true,
-      'ai:read': true,
-      'ai:update': true,
-      'ai:delete': true,
-      'user:create': true,
-      'user:read': true,
-      'user:update': true,
-      'user:delete': true,
-      'system:read': true,
-      'system:update': true
-    }
-  };
-
-  return permissions[userType]?.[requiredPermission] || false;
+export function checkPermission(
+  userType: string,
+  requiredPermission: string,
+  isSuperAdmin = false,
+  userId?: string
+): boolean {
+  return hasEffectivePermission(userId, userType, requiredPermission, isSuperAdmin);
 }
 
 // 权限检查中间件
@@ -244,7 +139,9 @@ export function permissionMiddleware(requiredPermission: string) {
     }
 
     // 检查权限
-    if (!checkPermission(userType || 'admin', requiredPermission, isSuperAdmin)) {
+    const userId = authResponse.headers.get('X-User-Id') || undefined;
+
+    if (!checkPermission(userType || 'admin', requiredPermission, isSuperAdmin, userId)) {
       return NextResponse.json({ error: '权限不足' }, { status: 403 });
     }
 

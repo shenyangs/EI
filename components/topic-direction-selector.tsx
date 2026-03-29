@@ -40,6 +40,22 @@ function parseConfidence(confidence: string) {
   return Number.isNaN(parsed) ? 0 : parsed;
 }
 
+function describeConfidence(value: number) {
+  if (value >= 90) {
+    return { label: "强推荐", note: "已经接近可直接进入框架阶段。" };
+  }
+
+  if (value >= 75) {
+    return { label: "可采用", note: "稍作人工收束后就能继续推进。" };
+  }
+
+  if (value >= 60) {
+    return { label: "可参考", note: "需要再补边界和方法焦点。" };
+  }
+
+  return { label: "待收敛", note: "建议继续缩小范围后再选用。" };
+}
+
 export function TopicDirectionSelector({
   projectId,
   options: initialOptions,
@@ -218,6 +234,9 @@ export function TopicDirectionSelector({
   const currentFingerprint = createArchiveFingerprint([selected.id, currentNote]);
   const archiveRecord = getRecord(archiveKey);
   const isCurrentArchived = matchesCurrent(archiveKey, currentFingerprint);
+  const selectedConfidenceLabel = describeConfidence(selectedConfidence);
+  const confidenceGapLabel =
+    Math.max(bestConfidence - selectedConfidence, 0) <= 5 ? "已接近最佳" : "还有优化空间";
   const archiveStateLabel = isReady
     ? isCurrentArchived
       ? "已建立稳定起点"
@@ -345,12 +364,12 @@ export function TopicDirectionSelector({
             <div className="decision-metrics">
               <div className="decision-metric">
                 <span>方案信心</span>
-                <strong>{selectedConfidence}%</strong>
-                <p>AI 对当前方向的推荐强度。</p>
+                <strong>{selectedConfidenceLabel.label}</strong>
+                <p>{selectedConfidenceLabel.note}</p>
               </div>
               <div className="decision-metric">
                 <span>与最佳差距</span>
-                <strong>{Math.max(bestConfidence - selectedConfidence, 0)}%</strong>
+                <strong>{confidenceGapLabel}</strong>
                 <p>如果差距很小，说明这条路线已经足够稳。</p>
               </div>
               <div className="decision-metric">

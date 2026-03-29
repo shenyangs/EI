@@ -1,16 +1,26 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-import { PaperTypeSelector } from "@/components/paper-type-selector";
-import { ProjectCard } from "@/components/project-card";
 import { projectCards } from "@/lib/demo-data";
-import type { PaperCategory } from "@/lib/paper-type-profiles";
-
+import {
+  getPaperTypeById,
+  paperTypeProfiles,
+  type PaperCategory
+} from "@/lib/paper-type-profiles";
 import type { ProjectCardItem } from "@/lib/demo-data";
 
 type Project = ProjectCardItem;
+
+const workflowSteps = [
+  { key: "discover", label: "探索", subtitle: "Discovery" },
+  { key: "define", label: "题型", subtitle: "Type" },
+  { key: "structure", label: "布局", subtitle: "Structure" },
+  { key: "draft", label: "写作", subtitle: "Drafting" },
+  { key: "review", label: "审阅", subtitle: "Review" },
+  { key: "finalize", label: "定稿", subtitle: "Finalize" }
+];
 
 export default function HomePage() {
   const [selectedPaperType, setSelectedPaperType] = useState<PaperCategory>("ei-conference");
@@ -22,33 +32,28 @@ export default function HomePage() {
     canGeneratePaperDraft: false,
     canUseWebSearch: false
   });
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function fetchAiStatus() {
       try {
         const response = await fetch("/api/ai/status", { cache: "no-store" });
-        if (response.ok) {
-          const data = await response.json();
-          setAi({
-            provider: data.provider,
-            model: data.model,
-            hasApiKey: data.hasApiKey,
-            webSearchEnabled: data.webSearchEnabled,
-            canGeneratePaperDraft: data.canGeneratePaperDraft,
-            canUseWebSearch: data.canUseWebSearch
-          });
-        }
+        if (!response.ok) return;
+        const data = await response.json();
+        setAi({
+          provider: data.provider,
+          model: data.model,
+          hasApiKey: data.hasApiKey,
+          webSearchEnabled: data.webSearchEnabled,
+          canGeneratePaperDraft: data.canGeneratePaperDraft,
+          canUseWebSearch: data.canUseWebSearch
+        });
       } catch (error) {
         console.error("Failed to fetch AI status:", error);
       }
     }
 
-    fetchAiStatus();
-  }, []);
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
     async function fetchProjects() {
       try {
         const response = await fetch("/api/projects");
@@ -63,172 +68,174 @@ export default function HomePage() {
       }
     }
 
-    fetchProjects();
+    void fetchAiStatus();
+    void fetchProjects();
   }, []);
 
   const displayProjects = projects.length > 0 ? projects : projectCards;
   const latestProject = displayProjects[0];
+  const selectedProfile = useMemo(() => getPaperTypeById(selectedPaperType), [selectedPaperType]);
 
   return (
-    <main className="home-page home-page--stitch">
-      <section className="stitch-command-home stitch-command-home--compact">
-        <div className="stitch-command-home__main">
-          <div className="hero-card__top">
-            <span className="eyebrow">AI Academic Editorial System</span>
-            <span className="hero-plaque">Atelier EI</span>
+    <main className="atelier-home">
+      <section className="atelier-home__hero">
+        <div className="atelier-home__intro">
+          <div className="atelier-kicker-row">
+            <span className="atelier-kicker">首页入口</span>
+            <span className="atelier-mark">当前项目与下一步</span>
           </div>
-          <div className="stitch-home-heading">
-            <h1>AI 学术编辑工作台</h1>
-            <p>
-              从选题、框架、写作到定稿，把论文流程拆成连续的工作台，不再靠一堆零散页面硬拼。
-            </p>
-          </div>
-          <div className="stitch-home-inline-summary">
-            <div className="stitch-home-inline-summary__item">
-              <span>当前推荐入口</span>
-              <strong>先从研究主题开始</strong>
-            </div>
-            <div className="stitch-home-inline-summary__item">
-              <span>主流程</span>
-              <strong>选题 → 路径 → 框架 → 写作 → 文献 → 定稿</strong>
-            </div>
-            <div className="stitch-home-inline-summary__item">
-              <span>目标</span>
-              <strong>输出可留档、可导出的完整 EI 稿件</strong>
-            </div>
-          </div>
-          <div className="stitch-command-home__actions">
-            <Link className="primary-button" href="/projects/new">
-              新建研究项目
-            </Link>
-            <Link className="secondary-button" href="/projects/atelier-zero?venue=ieee-iccci-2026">
-              继续最近项目
-            </Link>
-          </div>
+          <h1>先看当前项目，再决定下一步</h1>
+          <p>
+            这里不放复杂功能，只保留最近项目、当前阶段和新建入口。先判断，再进入具体工作台。
+          </p>
         </div>
 
-        <aside className="stitch-command-home__rail">
-          <section className="stitch-brief-card">
-            <span className="eyebrow">继续当前工作</span>
+        <aside className="atelier-home__focus">
+          <div className="atelier-focus-card">
+            <span className="atelier-kicker">继续当前工作</span>
             <strong>{latestProject?.title ?? "示例项目"}</strong>
-            <p>{latestProject?.subtitle ?? "打开项目后，先看当前阶段，再决定继续写哪一章。"}</p>
-            <Link
-              className="secondary-button"
-              href={buildProjectHref(latestProject?.id, latestProject?.venueId)}
-            >
+            <p>{latestProject?.subtitle ?? "打开项目后继续章节写作与质量检查。"}</p>
+            <Link className="atelier-button atelier-button--ghost" href={buildProjectHref(latestProject?.id, latestProject?.venueId)}>
               继续上次项目
             </Link>
-          </section>
-
-          <section className="stitch-brief-card stitch-brief-card--muted">
-            <span className="eyebrow">当前系统状态</span>
-            <div className="stitch-status-list">
-              <div>
-                <span>模型</span>
-                <strong>{ai.model}</strong>
-              </div>
-              <div>
-                <span>联网检索</span>
-                <strong>{ai.canUseWebSearch ? "已开启" : "未开启"}</strong>
-              </div>
-              <div>
-                <span>写作草稿</span>
-                <strong>{ai.canGeneratePaperDraft ? "可生成" : "准备中"}</strong>
-              </div>
+          </div>
+          <div className="atelier-status-card">
+            <div>
+              <span>模型</span>
+              <strong>{ai.model}</strong>
             </div>
-          </section>
+            <div>
+              <span>联网检索</span>
+              <strong>{ai.canUseWebSearch ? "已开启" : "未开启"}</strong>
+            </div>
+            <div>
+              <span>写作草稿</span>
+              <strong>{ai.canGeneratePaperDraft ? "可生成" : "准备中"}</strong>
+            </div>
+          </div>
         </aside>
       </section>
 
-      <section className="stitch-home-grid">
-        <div className="stitch-home-grid__main">
-          <section className="content-card stitch-panel stitch-panel--flow">
-            <div className="card-heading card-heading--stack">
-              <span className="eyebrow">研究流程</span>
-              <h2>把论文流程拆成 6 个清晰阶段</h2>
-              <p>每一步只做一件事，方便判断、推进和回退。</p>
-            </div>
-            <div className="stitch-flow-board">
-              <article className="stitch-flow-step">
-                <span>01</span>
-                <strong>定研究主题</strong>
-                <p>先把对象、场景、关键词和目标会议定清楚。</p>
-              </article>
-              <article className="stitch-flow-step">
-                <span>02</span>
-                <strong>选研究路径</strong>
-                <p>从多个题型或方案里选一条最适合继续写的路线。</p>
-              </article>
-              <article className="stitch-flow-step">
-                <span>03</span>
-                <strong>锁论文框架</strong>
-                <p>先把章节骨架和每章目标固定，再进入正文写作。</p>
-              </article>
-              <article className="stitch-flow-step">
-                <span>04</span>
-                <strong>逐章写作</strong>
-                <p>单章生成、修改、检查、补证据，不把任务混在一起。</p>
-              </article>
-              <article className="stitch-flow-step">
-                <span>05</span>
-                <strong>整理文献证据</strong>
-                <p>把引用、出处、备注和材料准备好，不把证据工作留到最后。</p>
-              </article>
-              <article className="stitch-flow-step">
-                <span>06</span>
-                <strong>全文定稿</strong>
-                <p>最后统一检查结构、格式、引用和导出结果。</p>
-              </article>
-            </div>
-          </section>
+      <section className="atelier-home__strip">
+        {workflowSteps.map((step, index) => (
+          <article key={step.key} className="atelier-strip-step">
+            <span>{String(index + 1).padStart(2, "0")}</span>
+            <strong>{step.label}</strong>
+            <small>{step.subtitle}</small>
+          </article>
+        ))}
+      </section>
 
-          <section className="content-card stitch-projects-panel stitch-projects-panel--home">
-            <div className="grid-header">
+      <section className="atelier-home__body">
+        <div className="atelier-home__main">
+          <section className="atelier-panel atelier-panel--projects">
+            <div className="atelier-panel__head">
               <div>
-                <span className="eyebrow">当前项目</span>
-                <h2>继续你已经推进中的研究项目</h2>
+                <span className="atelier-kicker">继续最近的工作</span>
+                <h2>当前项目</h2>
               </div>
-              <p>先看当前阶段和下一步入口，再继续推进，不回到旧式项目列表。</p>
+              <Link className="atelier-text-link" href="/projects/new">
+                新建研究项目
+              </Link>
             </div>
-            <div className="project-grid project-grid--home top-gap">
+            <div className="atelier-project-list">
               {loading ? (
-                <div className="project-card">
-                  <p>加载项目中...</p>
-                </div>
+                <div className="atelier-project-row atelier-project-row--loading">加载项目中...</div>
               ) : (
-                displayProjects.map((project) => (
-                  <ProjectCard key={project.id} project={project} />
-                ))
+                displayProjects.map((project) => {
+                  const progressLabel =
+                    project.stage === "已确定主题方向"
+                      ? "下一步：进入题型与方案"
+                      : project.stage === "已拆论文框架"
+                        ? "下一步：进入逐章写作"
+                        : project.stage === "分章节写作中"
+                          ? "下一步：继续处理当前章节"
+                          : "下一步：检查全文并导出";
+
+                  return (
+                    <Link
+                      key={project.id}
+                      className="atelier-project-row"
+                      href={buildProjectHref(project.id, project.venueId)}
+                    >
+                      <div className="atelier-project-row__main">
+                        <div className="atelier-project-row__meta">
+                          <span>{project.stage}</span>
+                          <span>{project.updatedAt}</span>
+                        </div>
+                        <strong>{project.title}</strong>
+                        <p>{project.subtitle}</p>
+                      </div>
+                      <div className="atelier-project-row__side">
+                        <span>{project.conference}</span>
+                        <strong>{progressLabel}</strong>
+                      </div>
+                    </Link>
+                  );
+                })
               )}
             </div>
           </section>
         </div>
 
-        <div className="stitch-home-grid__side">
-          <section className="content-card stitch-panel">
-            <div className="card-heading card-heading--stack">
-              <span className="eyebrow">研究设置</span>
-              <h3>先确认题型，再进入框架</h3>
-              <p>题型明确后，结构、自检和导出规则才会切到正确模式。</p>
+        <aside className="atelier-home__rail">
+          <section className="atelier-panel atelier-panel--settings">
+            <div className="atelier-panel__head atelier-panel__head--stack">
+              <span className="atelier-kicker">研究设置</span>
+              <h2>先确认题型，再进入框架</h2>
+              <p>首页只保留当前题型的关键约束，详细流程进入项目后再展开。</p>
             </div>
-            <PaperTypeSelector
-              onTypeChange={setSelectedPaperType}
-              initialType={selectedPaperType}
-              compact
-            />
+
+            <div className="atelier-type-grid">
+              {paperTypeProfiles.map((profile) => (
+                <button
+                  key={profile.id}
+                  className={profile.id === selectedPaperType ? "atelier-type-chip active" : "atelier-type-chip"}
+                  onClick={() => setSelectedPaperType(profile.id)}
+                  type="button"
+                >
+                  <span>{profile.shortName}</span>
+                  <small>{profile.category}</small>
+                </button>
+              ))}
+            </div>
+
+            <div className="atelier-type-summary">
+              <div className="atelier-type-summary__card">
+                <span>摘要</span>
+                <strong>{selectedProfile.requirements.abstract.split("，")[0]}</strong>
+              </div>
+              <div className="atelier-type-summary__card">
+                <span>篇幅</span>
+                <strong>{selectedProfile.requirements.length.split("，")[0]}</strong>
+              </div>
+              <div className="atelier-type-summary__card atelier-type-summary__card--wide">
+                <span>结构</span>
+                <strong>{selectedProfile.requirements.structure.split("，")[0]}</strong>
+              </div>
+              <div className="atelier-type-summary__card atelier-type-summary__card--wide">
+                <span>写作取向</span>
+                <strong>{selectedProfile.writingStyle.tone.split("，")[0]}</strong>
+              </div>
+            </div>
+
+            <Link className="atelier-button" href={`/projects/new?paperType=${selectedPaperType}`}>
+              开始创作{selectedProfile.shortName}
+            </Link>
           </section>
-          <section className="content-card stitch-panel">
-            <div className="card-heading card-heading--stack">
-              <span className="eyebrow">操作原则</span>
-              <h3>首页只负责入口和判断</h3>
+
+          <section className="atelier-panel atelier-panel--principles">
+            <div className="atelier-panel__head atelier-panel__head--stack">
+              <span className="atelier-kicker">操作原则</span>
+              <h2>首页负责入口和判断</h2>
             </div>
-            <ul className="bullet-list">
-              <li>先判断当前阶段和下一步，不让用户一上来面对一堆功能。</li>
-              <li>让写作、检查、文献、定稿各自占据独立视图，而不是混在一个页面。</li>
-              <li>首页负责总览和入口，项目页负责决策，工作台负责深度处理。</li>
+            <ul className="atelier-bullets">
+              <li>先看当前阶段，再决定下一步，不让用户一上来面对一堆功能。</li>
+              <li>写作、文献、审阅、定稿各自独立，不混在同一张后台页面里。</li>
+              <li>真正的深度处理放到项目工作台里，不在首页堆满说明卡。</li>
             </ul>
           </section>
-        </div>
+        </aside>
       </section>
     </main>
   );

@@ -1,137 +1,165 @@
-# 跨学科 EI 论文工作台
+# Atelier EI 学术编辑工作台
 
-一个面向服装、设计、时尚、人文社科与技术交叉研究的 EI 会议论文生成与规范化工作台。
+`v0.2.0 大更新`
 
-## 项目简介
+一个面向服装、设计、时尚、人文社科与技术交叉研究的 EI 论文工作台。  
+这次版本不再只是“论文生成器”，而是改成了一套更完整的 **研究推进 + 写作编辑 + 超级管理员控制台**。
 
-本项目旨在帮助研究人员更高效地生成符合 EI 会议要求的论文，特别是针对跨学科研究领域。系统提供了从主题选择、大纲生成、章节写作到格式导出的完整工作流程。
+## 这次大更新改了什么
 
-## 核心功能
+### 1. 整体界面重构
 
-- **智能主题方向生成**：基于用户输入的主题，生成具体的研究方向建议
-- **分阶段论文写作**：按章节生成内容，支持逐章修改和确认
-- **会议规则适配**：根据目标会议的要求自动调整论文格式和结构
-- **质量检查**：从学术性、逻辑性、完整性等多个维度评估论文质量
-- **多格式导出**：支持导出 LaTeX、DOCX 和 PDF 格式
-- **参考文献管理**：支持 BibTeX 导入和管理
+- 首页、项目总览、章节写作、文献中心、定稿页，全部按新的工作台逻辑重做
+- 不再沿用旧后台那种零散卡片式结构，改成更清晰的研究推进视图
+- 桌面端和移动端都做了统一收口，不再是桌面缩小版
+
+### 2. AI 模型路由升级
+
+- 系统同时支持 `Gemini` 和 `MiniMax`
+- 系统预置逻辑已经接通：
+  - 深度思考、研究方向、评审、指导：优先 `Gemini`
+  - 大量生成、改稿、搜索相关：优先 `MiniMax`
+- 超级管理员可以按功能块切换模型：
+  - 跟随系统预置
+  - 固定 Gemini
+  - 固定 MiniMax
+  - 固定自定义模型
+
+### 3. 超级管理员后台扩成完整控制台
+
+这次不再只有简单模型页，而是补成一套真正可用的超管后台：
+
+- 超管总览
+- 用户与权限
+- 角色与用户组
+- 运行诊断
+- 审计日志
+- 系统配置
+- AI 模型管理
+- AI 功能模型切换
+
+### 4. 系统状态变成真实可观测
+
+- 首页和超管后台都能看到 AI 模型、联网搜索的真实状态
+- 系统默认模型现在会显示：
+  - 是否已配置
+  - 是否已连通
+  - 延时信息
+  - 最近探测时间
+- 模型切换页已经改成“快模型先显示、慢模型后补上”，不会再被慢探测整页拖住
+
+### 5. 主站行为与后台配置真正接通
+
+以前很多后台开关只是“看起来存在”，这次已经接到主站行为：
+
+- `公开注册入口`：能真实控制注册入口和注册接口
+- `联网搜索`：能真实影响系统联网能力状态
+- `AI 自动补全`：能真实影响新建项目页和写作页的 AI 操作
+
+### 6. 写作与文献流程更顺了
+
+- 全文页里的“去补参考文献”已经接到文献中心
+- 会自动带上当前项目/章节关键词进入搜索模式
+- 定稿页全文生成不再只是几段凑数，而是改成按章节扩写和整合
+
+## 当前版本的核心能力
+
+- 新建论文项目
+- 生成研究方向建议
+- 锁定论文框架
+- 按章节写作与修改
+- 参考文献管理与搜索
+- 全文预览与定稿导出
+- 超级管理员统一管理 AI、用户、权限和系统配置
 
 ## 技术栈
 
-- **前端**：Next.js 15, React 19, TypeScript
-- **后端**：Next.js API 路由
-- **AI 集成**：支持多种 AI 模型（Minimax, Google Gemini）
-- **数据库**：SQLite（开发环境）
-- **样式**：CSS3（自定义变量和响应式设计）
+- 前端：Next.js 15、React 19、TypeScript
+- 后端：Next.js App Router + API Routes
+- AI：Google Gemini、MiniMax、自定义模型接入
+- 数据：SQLite（开发环境）
+- 样式：自定义 CSS 设计系统
 
 ## 快速开始
 
-### 环境要求
-
-- Node.js 18.0 或更高版本
-- npm 或 yarn 包管理器
-
-### 安装步骤
-
-1. 克隆项目
-
-```bash
-git clone https://github.com/yourusername/ei-fashion-workbench.git
-cd ei-fashion-workbench
-```
-
-2. 安装依赖
+### 1. 安装依赖
 
 ```bash
 npm install
 ```
 
-3. 配置环境变量
+### 2. 配置环境变量
 
-复制 `.env.example` 文件并重命名为 `.env`，然后填写相应的环境变量：
+至少建议准备这些：
 
-```bash
-cp .env.example .env
-```
+- `MINIMAX_API_KEY`
+- `MINIMAX_BASE_URL`
+- `MINIMAX_MODEL`
+- `GEMINI_API_KEY`
+- `GEMINI_BASE_URL`
+- `GEMINI_MODEL`
 
-4. 启动开发服务器
+如果你已经在 Vercel 项目里配置好了环境变量，也可以直接执行拉取。
+
+### 3. 启动开发环境
 
 ```bash
 npm run dev
 ```
 
-5. 访问应用
+默认访问：
 
-打开浏览器访问 `http://localhost:3000`
+- 主站首页：`http://localhost:3000`
+- 超管后台：点左下角小钥匙进入
+
+## 主要页面
+
+- `/`：首页入口与当前项目概览
+- `/projects/new`：新建研究项目
+- `/projects/[projectId]`：项目总览
+- `/projects/[projectId]/profile`：研究方向
+- `/projects/[projectId]/outline`：论文框架
+- `/projects/[projectId]/writing`：章节写作
+- `/projects/[projectId]/references`：文献中心
+- `/projects/[projectId]/export`：全文定稿
+- `/admin`：超级管理员总览
+
+## 超级管理员后台说明
+
+超管后台主要负责四件事：
+
+- 看系统当前是否真的可用
+- 调整 AI 模型和功能块路由
+- 管理用户、角色、权限和用户组
+- 管理系统配置、审计日志与运行诊断
+
+当前建议：
+
+- 不要把所有功能块都手动绑死，优先让大部分块跟随系统预置
+- 只在你明确知道某类任务更适合某个模型时，再做固定绑定
 
 ## 项目结构
 
-```
-├── app/                # Next.js 应用目录
-│   ├── api/            # API 路由
-│   ├── admin/          # 管理界面
-│   ├── login/          # 登录页面
-│   ├── profile/        # 用户个人资料
-│   ├── projects/       # 项目管理
-│   └── register/       # 注册页面
-├── components/         # 可复用组件
-├── docs/               # 文档目录
-│   └── plans/          # 设计规划文档
-├── lib/                # 核心库
-│   ├── ai/             # AI 相关功能
-│   ├── server/         # 服务器端功能
-│   └── *.ts            # 通用工具函数
-├── __tests__/          # 测试文件
-├── .env.example        # 环境变量示例
-├── next.config.ts      # Next.js 配置
-├── package.json        # 项目配置和依赖
-└── tsconfig.json       # TypeScript 配置
+```text
+app/
+  api/                 API 路由
+  admin/               超级管理员后台
+  login/               登录页
+  register/            注册页
+  projects/            项目主流程
+components/            页面与业务组件
+docs/plans/            规划与设计文档
+lib/                   AI、权限、运行时、服务端逻辑
 ```
 
-## 使用指南
+## 校验命令
 
-### 1. 新建论文项目
+```bash
+npm run lint
+npm run type-check
+```
 
-- 访问 `/projects/new` 页面
-- 输入研究主题、关键词和目标会议
-- 选择论文类型
+## 仓库地址
 
-### 2. 生成论文大纲
+- GitHub: [https://github.com/shenyangs/EI](https://github.com/shenyangs/EI)
 
-- 系统会根据主题自动生成论文大纲
-- 您可以调整大纲结构和内容
-
-### 3. 逐章写作
-
-- 进入 `/projects/[projectId]/writing` 页面
-- 选择章节进行写作
-- AI 会辅助生成章节内容
-- 您可以编辑和确认每章内容
-
-### 4. 质量检查
-
-- 系统会自动检查论文质量
-- 提供改进建议
-
-### 5. 格式导出
-
-- 进入 `/projects/[projectId]/export` 页面
-- 选择导出格式（LaTeX、DOCX、PDF）
-- 下载导出文件
-
-## 贡献指南
-
-1. Fork 项目
-2. 创建功能分支 (`git checkout -b feature/AmazingFeature`)
-3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
-4. 推送到分支 (`git push origin feature/AmazingFeature`)
-5. 打开 Pull Request
-
-## 许可证
-
-本项目采用 MIT 许可证 - 详见 LICENSE 文件
-
-## 联系方式
-
-- 项目维护者：[Your Name]
-- 邮箱：[your.email@example.com]
-- 项目链接：[https://github.com/yourusername/ei-fashion-workbench](https://github.com/yourusername/ei-fashion-workbench)

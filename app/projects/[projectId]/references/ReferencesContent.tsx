@@ -2,16 +2,23 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 
 import { ReferenceManagerPanel } from "@/components/reference-manager";
 import { buildVenueHref } from "@/lib/venue-profiles";
 
 type ReferencesContentProps = {
   projectId: string;
+  projectTitle: string;
 };
 
-export default function ReferencesContent({ projectId }: ReferencesContentProps) {
-  const [activeTab, setActiveTab] = useState<"references" | "materials">("references");
+export default function ReferencesContent({ projectId, projectTitle }: ReferencesContentProps) {
+  const searchParams = useSearchParams();
+  const tab = searchParams.get("tab");
+  const mode = searchParams.get("mode");
+  const query = searchParams.get("q") ?? "";
+  const autoSearch = searchParams.get("autoSearch") === "1";
+  const [activeTab, setActiveTab] = useState<"references" | "materials">(tab === "materials" ? "materials" : "references");
 
   return (
     <div className="workbench-stack">
@@ -40,7 +47,12 @@ export default function ReferencesContent({ projectId }: ReferencesContentProps)
 
       {activeTab === "references" ? (
         <>
-          <ReferenceManagerPanel projectId={projectId} />
+          <ReferenceManagerPanel
+            projectId={projectId}
+            initialQuery={query || projectTitle}
+            autoSearch={autoSearch}
+            initialViewMode={mode === "search" ? "search" : "list"}
+          />
 
           <section className="content-card stitch-panel">
             <div className="card-heading card-heading--stack">

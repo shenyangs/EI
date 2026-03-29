@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { defaultPublicSystemConfig, fetchPublicSystemConfig } from "@/lib/client/public-system";
 
 interface RegisterFormData {
   username: string;
@@ -30,6 +31,8 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [passwordStrength, setPasswordStrength] = useState<string>("");
+  const [allowRegistration, setAllowRegistration] = useState(defaultPublicSystemConfig.allowRegistration);
+  const [configLoaded, setConfigLoaded] = useState(false);
 
   const userTypes = [
     { value: "student", label: "学生" },
@@ -39,6 +42,18 @@ export default function RegisterPage() {
     { value: "advisor", label: "博导" },
     { value: "admin", label: "管理员" },
   ];
+
+  useEffect(() => {
+    void fetchPublicSystemConfig()
+      .then((config) => {
+        setAllowRegistration(config.allowRegistration);
+        setConfigLoaded(true);
+      })
+      .catch(() => {
+        setAllowRegistration(true);
+        setConfigLoaded(true);
+      });
+  }, []);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -66,6 +81,11 @@ export default function RegisterPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+
+    if (!allowRegistration) {
+      setError("当前系统已关闭公开注册，请联系管理员开通账号。");
+      return;
+    }
 
     // 表单验证
     if (formData.password !== formData.confirmPassword) {
@@ -119,6 +139,12 @@ export default function RegisterPage() {
           <h1>注册</h1>
           <p>创建 EI 论文工作台账号</p>
         </div>
+
+        {configLoaded && !allowRegistration ? (
+          <div className="auth-error">
+            当前系统已关闭公开注册。你仍然可以去登录页使用已有账号，或者联系管理员开通。
+          </div>
+        ) : null}
 
         {error && (
           <div className="auth-error">
@@ -251,7 +277,7 @@ export default function RegisterPage() {
           <button
             type="submit"
             className="primary-button auth-button"
-            disabled={loading}
+            disabled={loading || !allowRegistration}
           >
             {loading ? (
               <span className="button-loading">
