@@ -82,55 +82,17 @@ export function FullTextPreview({
   const [review, setReview] = useState<AiQualityReport | null>(null);
   const [reviewLoading, setReviewLoading] = useState(false);
   const [isPending, startTransition] = useTransition();
-  const [outline, setOutline] = useState<any[]>([]);
   const { archiveCurrent, getRecord, matchesCurrent, upsertRecord } = useProjectArchive(projectId);
-
-  // 从本地存档获取大纲数据
-  useEffect(() => {
-    const outlineRecord = getRecord("outline");
-    if (outlineRecord) {
-      // 这里可以从存档中获取大纲数据
-      // 为了演示，我们使用默认大纲
-      setOutline([
-        {
-          id: "section-1",
-          title: "1. 绪论",
-          goal: "介绍研究背景、问题陈述和研究意义",
-          summary: "包括研究背景、研究问题、研究目的、研究意义、研究方法、论文结构等内容"
-        },
-        {
-          id: "section-2",
-          title: "2. 文献综述",
-          goal: "梳理相关研究现状和理论基础",
-          summary: "包括国内外研究现状、理论基础、研究缺口等内容"
-        },
-        {
-          id: "section-3",
-          title: "3. 研究方法",
-          goal: "详细描述研究设计和方法",
-          summary: "包括研究设计、数据收集方法、数据分析方法等内容"
-        },
-        {
-          id: "section-4",
-          title: "4. 研究结果",
-          goal: "呈现研究数据和结果",
-          summary: "包括数据描述、结果分析、发现等内容"
-        },
-        {
-          id: "section-5",
-          title: "5. 讨论",
-          goal: "解释研究结果的意义和影响",
-          summary: "包括结果解释、与现有研究的比较、理论贡献、实践意义等内容"
-        },
-        {
-          id: "section-6",
-          title: "6. 结论与展望",
-          goal: "总结研究成果和未来研究方向",
-          summary: "包括研究结论、研究局限、未来研究方向等内容"
-        }
-      ]);
-    }
-  }, [getRecord]);
+  const sectionDigest = useMemo(
+    () =>
+      sections.map((section) => ({
+        id: section.id,
+        title: section.title,
+        paragraphCount: section.content.filter(Boolean).length,
+        preview: section.content[0] ?? "这一章正在等待正文整合。"
+      })),
+    [sections]
+  );
 
   const currentFullText = useMemo(() => {
     if (generatedPreview) {
@@ -144,6 +106,8 @@ export function FullTextPreview({
       ...sections.map((section) => `${section.title}\n${section.content.join("\n\n")}`)
     ].join("\n\n");
   }, [abstract, generatedPreview, keywords, projectTitle, sections]);
+  const charCount = currentFullText.replace(/\s+/g, "").length;
+  const paragraphCount = currentFullText.split(/\n{2,}/).filter(Boolean).length;
   const archiveKey = "fulltext";
   const currentFingerprint = createArchiveFingerprint([currentFullText]);
   const archiveRecord = getRecord(archiveKey);
@@ -213,7 +177,9 @@ export function FullTextPreview({
     startTransition(async () => {
       setMessage("正在基于大纲生成全文...");
 
-      const outlineContent = outline.map((item) => `${item.title}\n目标：${item.goal}\n内容摘要：${item.summary}`).join("\n\n");
+      const outlineContent = sectionDigest
+        .map((item) => `${item.title}\n段落数：${item.paragraphCount}\n内容摘要：${item.preview}`)
+        .join("\n\n");
 
       const result = await requestDraft(
         `请根据下面的论文信息和大纲，为《${projectTitle}》生成一版符合EI发表要求的中文全文。
@@ -307,7 +273,7 @@ ${outlineContent}`
 
   return (
     <div className="workbench-stack">
-      <section className="content-card content-card--accent">
+      <section className="content-card content-card--accent stitch-panel">
         <div className="card-heading card-heading--stack">
           <span className="eyebrow">完整全文预览</span>
           <h3>先通读这一版，再决定要不要定稿</h3>
@@ -317,10 +283,27 @@ ${outlineContent}`
             <span className="selection-spotlight__label">当前稿件</span>
             <strong>{projectTitle}</strong>
             <p>
-              当前约 {currentFullText.replace(/\s+/g, "").length} 字，关键词 {keywords.length} 个。
+              当前约 {charCount} 字，关键词 {keywords.length} 个。
             </p>
           </div>
           <span className="ghost-chip ghost-chip--accent">{venueProfile.shortName}</span>
+        </div>
+        <div className="decision-metrics top-gap">
+          <div className="decision-metric">
+            <span>章节数</span>
+            <strong>{sections.length}</strong>
+            <p>定稿前先确认全篇结构有没有断层。</p>
+          </div>
+          <div className="decision-metric">
+            <span>段落数</span>
+            <strong>{paragraphCount}</strong>
+            <p>太少通常说明论证层次还不够完整。</p>
+          </div>
+          <div className="decision-metric">
+            <span>版本状态</span>
+            <strong>{isCurrentArchived ? "已定稿留档" : "尚未确认定稿"}</strong>
+            <p>导出前最好先把当前全文锁成一个正式版本。</p>
+          </div>
         </div>
         <div className="button-row top-gap">
           <button className="secondary-button" onClick={regeneratePreview} type="button">
@@ -333,57 +316,100 @@ ${outlineContent}`
         </div>
       </section>
 
-      <section className="content-card">
-        <div className="card-heading card-heading--stack">
-          <span className="eyebrow">预览正文</span>
-          <h3>先看稿，再决定是否继续处理</h3>
-        </div>
-        {generatedPreview ? (
-          <div className="editor-surface fulltext-surface">
-            <p>{generatedPreview}</p>
+      <div className="fulltext-review-grid">
+        <section className="content-card stitch-panel">
+          <div className="card-heading card-heading--stack">
+            <span className="eyebrow">预览正文</span>
+            <h3>先看稿，再决定是否继续处理</h3>
           </div>
-        ) : (
-          <div className="editor-surface fulltext-surface">
-            <h4>题目</h4>
-            <p>{projectTitle}</p>
-            <h4>摘要</h4>
-            <p>{abstract}</p>
-            <h4>关键词</h4>
-            <p>{keywords.join("、")}</p>
-            {sections.map((section) => (
-              <div key={section.id} className="paper-preview-block">
-                <h4>{section.title}</h4>
-                {section.content.map((paragraph) => (
-                  <p key={paragraph}>{paragraph}</p>
-                ))}
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
+          {generatedPreview ? (
+            <div className="editor-surface fulltext-surface">
+              <p>{generatedPreview}</p>
+            </div>
+          ) : (
+            <div className="editor-surface fulltext-surface">
+              <h4>题目</h4>
+              <p>{projectTitle}</p>
+              <h4>摘要</h4>
+              <p>{abstract}</p>
+              <h4>关键词</h4>
+              <p>{keywords.join("、")}</p>
+              {sections.map((section) => (
+                <div key={section.id} className="paper-preview-block">
+                  <h4>{section.title}</h4>
+                  {section.content.map((paragraph) => (
+                    <p key={paragraph}>{paragraph}</p>
+                  ))}
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
 
-      <QualityReviewPanel
-        actionContext={{
-          scope: "fulltext",
-          projectId,
-          sections: sections.map((section) => ({
-            id: section.id,
-            title: section.title
-          })),
-          venueId: venueProfile.id
-        }}
-        emptyText="全文合成后，系统会自动检查长度、结构一致性和会议适配度。"
-        loading={reviewLoading}
-        report={review}
-        title="全文 AI 自检"
-      />
+        <div className="fulltext-review-rail">
+          <QualityReviewPanel
+            actionContext={{
+              scope: "fulltext",
+              projectId,
+              sections: sections.map((section) => ({
+                id: section.id,
+                title: section.title
+              })),
+              venueId: venueProfile.id
+            }}
+            emptyText="全文合成后，系统会自动检查长度、结构一致性和会议适配度。"
+            loading={reviewLoading}
+            report={review}
+            title="全文 AI 自检"
+          />
+
+          <section className="content-card stitch-panel">
+            <div className="card-heading card-heading--stack">
+              <span className="eyebrow">章节清单</span>
+              <h3>定稿时先看哪几章最可能出问题</h3>
+            </div>
+            <div className="stack-list">
+              {sectionDigest.map((item) => (
+                <div key={item.id} className="line-item line-item--column">
+                  <div className="line-item__head">
+                    <strong>{item.title}</strong>
+                    <span>{item.paragraphCount} 段</span>
+                  </div>
+                  <p>{item.preview}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section className="content-card stitch-panel">
+            <div className="card-heading card-heading--stack">
+              <span className="eyebrow">会议约束</span>
+              <h3>导出前最后再对一遍投稿规则</h3>
+            </div>
+            <div className="stack-list">
+              <div className="line-item line-item--column">
+                <strong>摘要要求</strong>
+                <p>{venueProfile.abstractRule}</p>
+              </div>
+              <div className="line-item line-item--column">
+                <strong>关键词要求</strong>
+                <p>{venueProfile.keywordRule}</p>
+              </div>
+              <div className="line-item line-item--column">
+                <strong>篇幅与参考文献</strong>
+                <p>{venueProfile.pageRule}；{venueProfile.referenceRule}</p>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
 
       <ArchiveActionPanel
         archiveLabel="确认并存档当前全文"
         archivedAt={archiveRecord?.archivedAt}
         archivedSummary={archiveRecord ? `${archiveRecord.title}：${archiveRecord.summary}` : undefined}
         currentLabel="当前将被锁定的全文版本"
-        currentSummary={`当前全文约 ${currentFullText.replace(/\s+/g, "").length} 字；开头内容：${shortenArchiveText(
+        currentSummary={`当前全文约 ${charCount} 字；开头内容：${shortenArchiveText(
           currentFullText
         )}`}
         description="全文页也必须有确认并存档。否则你每次重新整合一版，都不知道哪一版才是真正准备拿去导出或交付的版本。"

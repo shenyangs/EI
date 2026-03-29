@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
+import type { CSSProperties } from "react";
 
 import { buildVenueHref } from "@/lib/venue-profiles";
 
@@ -24,9 +25,16 @@ export function ProjectNav({ projectId, variant = "default" }: ProjectNavProps) 
   const searchParams = useSearchParams();
   const venueId = searchParams.get("venue");
   const isDock = variant === "dock";
+  const navStyle = {
+    "--project-nav-columns": items.length
+  } as CSSProperties;
 
   return (
-    <nav className={isDock ? "project-nav project-nav--dock" : "project-nav"} aria-label="项目导航">
+    <nav
+      className={isDock ? "project-nav project-nav--dock" : "project-nav"}
+      aria-label="项目导航"
+      style={navStyle}
+    >
       {items.map((item) => {
         const baseHref = `/projects/${projectId}${item.href}`;
         const href = buildVenueHref(baseHref, venueId);

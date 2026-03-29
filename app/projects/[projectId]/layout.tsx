@@ -25,7 +25,7 @@ export default async function ProjectLayout({
 
   return (
     <main className="project-shell">
-      <section className="project-summary">
+      <section className="project-summary project-summary--scholarly">
         <div className="project-summary__top">
           <Link className="sidebar-home" href="/">
             返回项目首页
@@ -33,22 +33,27 @@ export default async function ProjectLayout({
           <StatusBadge tone="amber">{project.stage}</StatusBadge>
         </div>
         <div className="project-summary__body">
-          <div>
+          <div className="project-summary__copy">
             <span className="eyebrow">当前项目</span>
             <h1>{project.title}</h1>
             <p>{project.subtitle}</p>
           </div>
-          <div className="hero-actions">
-            <span className="ghost-chip">主题方向已确定</span>
-            <span className="ghost-chip">框架可继续细化</span>
+          <div className="hero-actions project-summary__signals">
+            <span className="ghost-chip">研究方向已绑定</span>
+            <span className="ghost-chip">结构可继续细化</span>
+            <span className="ghost-chip">文献与证据可独立整理</span>
             <span className="ghost-chip ghost-chip--accent">
-              {ai.canUseWebSearch ? "M2.7 联网能力已开" : "联网能力待接入"}
+              {ai.canUseWebSearch ? "联网检索可用" : "联网检索待接入"}
             </span>
           </div>
         </div>
-        <div className="project-hero">
-          <div>
+        <div className="project-hero project-hero--scholarly">
+          <div className="project-hero__copy">
             <VenueHeaderInfo />
+          </div>
+          <div className="project-summary__note">
+            <span className="eyebrow">当前操作原则</span>
+            <p>先完成当前步骤，再进入下一步。项目页负责判断方向是否正确，不让用户在错误阶段做太多事。</p>
           </div>
         </div>
         <div className="progress-card">
@@ -62,7 +67,8 @@ export default async function ProjectLayout({
         <section className="content-card content-card--soft project-nav-shell">
           <div className="card-heading card-heading--stack">
             <span className="eyebrow">流程导航</span>
-            <h3>一步一屏，按顺序推进</h3>
+            <h3>研究流程导航（6 步）</h3>
+            <p>首页、项目页、写作页和文献页都围着同一条主线走，不让用户在不同页面学两套逻辑。</p>
           </div>
           <ProjectNav projectId={project.id} />
         </section>

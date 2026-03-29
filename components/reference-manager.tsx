@@ -22,6 +22,11 @@ export function ReferenceManagerPanel({ projectId }: ReferenceManagerProps) {
   const [importFormat, setImportFormat] = useState<"bibtex" | "ris">("bibtex");
   const [isImporting, setIsImporting] = useState(false);
   const [message, setMessage] = useState("");
+  const boundCount = references.filter((item) => item.notes?.trim()).length;
+  const doiCount = references.filter((item) => Boolean(item.doi)).length;
+  const importCount = references.filter((item) => item.source === "import").length;
+  const searchCount = references.filter((item) => item.source === "academic_search").length;
+  const latestYear = references.reduce((latest, item) => Math.max(latest, item.year || 0), 0);
 
   const loadReferences = useCallback(() => {
     const refs = ReferenceManager.getReferences(filter);
@@ -379,345 +384,114 @@ export function ReferenceManagerPanel({ projectId }: ReferenceManagerProps) {
   };
 
   return (
-    <div className="reference-manager">
+    <section className="content-card stitch-panel reference-manager-panel">
       <div className="manager-header">
-        <h2>参考文献管理</h2>
+        <div>
+          <h2>参考文献与材料中心</h2>
+          <p className="reference-count">这里负责收文献、补备注、导出引用，不只是做一个静态列表。</p>
+        </div>
         <span className="reference-count">{references.length} 篇文献</span>
+      </div>
+
+      <div className="decision-metrics">
+        <div className="decision-metric">
+          <span>已入库</span>
+          <strong>{references.length}</strong>
+          <p>当前项目已经纳入文献库的条目数。</p>
+        </div>
+        <div className="decision-metric">
+          <span>有 DOI</span>
+          <strong>{doiCount}</strong>
+          <p>这些条目后面做引用核验会更稳。</p>
+        </div>
+        <div className="decision-metric">
+          <span>有备注</span>
+          <strong>{boundCount}</strong>
+          <p>备注越清楚，写作时越容易知道这篇文献为什么要用。</p>
+        </div>
+      </div>
+
+      <div className="stitch-tab-navigation">
+        <button
+          className={viewMode === "list" ? "stitch-tab-button active" : "stitch-tab-button"}
+          onClick={() => setViewMode("list")}
+          type="button"
+        >
+          文献总览
+        </button>
+        <button
+          className={viewMode === "search" ? "stitch-tab-button active" : "stitch-tab-button"}
+          onClick={() => setViewMode("search")}
+          type="button"
+        >
+          学术搜索
+        </button>
+        <button
+          className={viewMode === "import" ? "stitch-tab-button active" : "stitch-tab-button"}
+          onClick={() => setViewMode("import")}
+          type="button"
+        >
+          批量导入
+        </button>
+        {selectedReference ? (
+          <button
+            className={viewMode === "detail" ? "stitch-tab-button active" : "stitch-tab-button"}
+            onClick={() => setViewMode("detail")}
+            type="button"
+          >
+            当前条目
+          </button>
+        ) : null}
+      </div>
+
+      <div className="reference-command-grid">
+        <section className="content-card stitch-panel">
+          <div className="card-heading card-heading--stack">
+            <span className="eyebrow">当前工作状态</span>
+            <h3>文献库现在最需要你补什么</h3>
+          </div>
+          <div className="stack-list">
+            <div className="line-item line-item--column">
+              <strong>导入来源分布</strong>
+              <p>学术搜索添加 {searchCount} 篇，手动或导入补入 {importCount} 篇。</p>
+            </div>
+            <div className="line-item line-item--column">
+              <strong>最新年份</strong>
+              <p>{latestYear > 0 ? `${latestYear} 年` : "暂无年份信息"}，投稿前最好保证核心综述里有近两年的关键文献。</p>
+            </div>
+            <div className="line-item line-item--column">
+              <strong>下一步建议</strong>
+              <p>先补备注，再筛 DOI 和出处，最后再导出 BibTeX 或 RIS，避免正文写完才发现引用信息不完整。</p>
+            </div>
+          </div>
+        </section>
+
+        <section className="content-card stitch-panel">
+          <div className="card-heading card-heading--stack">
+            <span className="eyebrow">使用顺序</span>
+            <h3>这页建议按这个流程来走</h3>
+          </div>
+          <div className="stack-list">
+            <div className="line-item line-item--column">
+              <strong>1. 先搜或导入</strong>
+              <p>把可能会用到的条目先纳入文献库，不急着一开始就写完整备注。</p>
+            </div>
+            <div className="line-item line-item--column">
+              <strong>2. 再筛与补注</strong>
+              <p>留下真正支撑方法、结果和讨论的关键文献，并说明它们分别用在哪里。</p>
+            </div>
+            <div className="line-item line-item--column">
+              <strong>3. 最后导出</strong>
+              <p>等正文结构稳定后再导出引用文件，能减少反复清理无效条目。</p>
+            </div>
+          </div>
+        </section>
       </div>
 
       {viewMode === "list" && renderListView()}
       {viewMode === "search" && renderSearchView()}
       {viewMode === "import" && renderImportView()}
       {viewMode === "detail" && renderDetailView()}
-
-      <style jsx>{`
-        .reference-manager {
-          background: white;
-          border-radius: 12px;
-          padding: 24px;
-          margin: 16px 0;
-        }
-
-        .manager-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 20px;
-          padding-bottom: 16px;
-          border-bottom: 1px solid #e5e7eb;
-        }
-
-        .manager-header h2 {
-          margin: 0;
-          font-size: 1.25rem;
-          color: #1f2937;
-        }
-
-        .reference-count {
-          font-size: 0.875rem;
-          color: #6b7280;
-        }
-
-        .reference-toolbar {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 20px;
-          gap: 16px;
-          flex-wrap: wrap;
-        }
-
-        .search-box {
-          display: flex;
-          gap: 8px;
-          flex: 1;
-          min-width: 300px;
-        }
-
-        .search-box input {
-          flex: 1;
-          padding: 8px 12px;
-          border: 1px solid #d1d5db;
-          border-radius: 6px;
-          font-size: 0.875rem;
-        }
-
-        .toolbar-actions {
-          display: flex;
-          gap: 8px;
-          flex-wrap: wrap;
-        }
-
-        .message-banner {
-          background: #eff6ff;
-          border: 1px solid #bfdbfe;
-          color: #1e40af;
-          padding: 12px;
-          border-radius: 6px;
-          margin-bottom: 16px;
-          font-size: 0.875rem;
-        }
-
-        .references-container {
-          display: flex;
-          flex-direction: column;
-          gap: 12px;
-        }
-
-        .reference-item {
-          border: 1px solid #e5e7eb;
-          border-radius: 8px;
-          padding: 16px;
-          background: #fafafa;
-        }
-
-        .reference-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: flex-start;
-          margin-bottom: 8px;
-          gap: 12px;
-        }
-
-        .reference-title {
-          margin: 0;
-          font-size: 1rem;
-          font-weight: 600;
-          color: #1f2937;
-          flex: 1;
-        }
-
-        .reference-actions {
-          display: flex;
-          gap: 8px;
-        }
-
-        .reference-authors {
-          margin: 0 0 4px 0;
-          font-size: 0.875rem;
-          color: #4b5563;
-        }
-
-        .reference-meta {
-          margin: 0;
-          font-size: 0.75rem;
-          color: #6b7280;
-        }
-
-        .reference-notes {
-          margin: 8px 0 0 0;
-          font-size: 0.875rem;
-          color: #374151;
-          font-style: italic;
-        }
-
-        .reference-abstract {
-          margin: 8px 0 0 0;
-          font-size: 0.875rem;
-          color: #6b7280;
-          line-height: 1.5;
-        }
-
-        .empty-state {
-          text-align: center;
-          padding: 40px;
-          color: #6b7280;
-        }
-
-        .search-header,
-        .import-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 20px;
-        }
-
-        .search-form {
-          display: flex;
-          gap: 12px;
-          margin-bottom: 20px;
-        }
-
-        .search-input {
-          flex: 1;
-          padding: 12px;
-          border: 1px solid #d1d5db;
-          border-radius: 6px;
-          font-size: 1rem;
-        }
-
-        .search-results {
-          display: flex;
-          flex-direction: column;
-          gap: 12px;
-        }
-
-        .import-format {
-          display: flex;
-          gap: 20px;
-          margin-bottom: 16px;
-        }
-
-        .import-format label {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          cursor: pointer;
-        }
-
-        .import-textarea {
-          width: 100%;
-          padding: 12px;
-          border: 1px solid #d1d5db;
-          border-radius: 6px;
-          font-family: monospace;
-          font-size: 0.875rem;
-          resize: vertical;
-        }
-
-        .import-actions {
-          margin-top: 16px;
-          text-align: right;
-        }
-
-        .detail-header {
-          margin-bottom: 20px;
-        }
-
-        .detail-content h2 {
-          margin: 0 0 12px 0;
-          font-size: 1.5rem;
-          color: #1f2937;
-        }
-
-        .detail-authors {
-          margin: 0 0 8px 0;
-          font-size: 1rem;
-          color: #4b5563;
-        }
-
-        .detail-meta {
-          margin: 0 0 16px 0;
-          font-size: 0.875rem;
-          color: #6b7280;
-        }
-
-        .detail-doi,
-        .detail-url {
-          margin: 8px 0;
-          font-size: 0.875rem;
-        }
-
-        .detail-doi a,
-        .detail-url a {
-          color: #3b82f6;
-          text-decoration: none;
-        }
-
-        .detail-doi a:hover,
-        .detail-url a:hover {
-          text-decoration: underline;
-        }
-
-        .detail-abstract,
-        .detail-keywords,
-        .detail-notes {
-          margin-top: 20px;
-        }
-
-        .detail-abstract h4,
-        .detail-keywords h4,
-        .detail-notes h4 {
-          margin: 0 0 8px 0;
-          font-size: 1rem;
-          color: #374151;
-        }
-
-        .detail-abstract p {
-          margin: 0;
-          font-size: 0.875rem;
-          line-height: 1.6;
-          color: #4b5563;
-        }
-
-        .keyword-list {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 8px;
-        }
-
-        .keyword-tag {
-          background: #eff6ff;
-          color: #1e40af;
-          padding: 4px 8px;
-          border-radius: 4px;
-          font-size: 0.75rem;
-        }
-
-        .detail-notes textarea {
-          width: 100%;
-          padding: 12px;
-          border: 1px solid #d1d5db;
-          border-radius: 6px;
-          font-size: 0.875rem;
-          resize: vertical;
-        }
-
-        .text-button {
-          background: none;
-          border: none;
-          color: #3b82f6;
-          cursor: pointer;
-          font-size: 0.875rem;
-          padding: 4px 8px;
-        }
-
-        .text-button:hover {
-          text-decoration: underline;
-        }
-
-        .text-button.danger {
-          color: #dc2626;
-        }
-
-        .primary-button {
-          background: #3b82f6;
-          color: white;
-          border: none;
-          padding: 8px 16px;
-          border-radius: 6px;
-          cursor: pointer;
-          font-size: 0.875rem;
-        }
-
-        .primary-button:hover:not(:disabled) {
-          background: #2563eb;
-        }
-
-        .primary-button:disabled {
-          opacity: 0.5;
-          cursor: not-allowed;
-        }
-
-        .secondary-button {
-          background: white;
-          color: #374151;
-          border: 1px solid #d1d5db;
-          padding: 8px 16px;
-          border-radius: 6px;
-          cursor: pointer;
-          font-size: 0.875rem;
-        }
-
-        .secondary-button:hover:not(:disabled) {
-          background: #f9fafb;
-        }
-
-        .secondary-button:disabled {
-          opacity: 0.5;
-          cursor: not-allowed;
-        }
-      `}</style>
-    </div>
+    </section>
   );
 }

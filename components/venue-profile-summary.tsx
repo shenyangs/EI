@@ -7,7 +7,7 @@ type VenueProfileSummaryProps = {
 
 export function VenueProfileSummary({ venue }: VenueProfileSummaryProps) {
   return (
-    <section className="content-card">
+    <section className="content-card stitch-panel">
       <div className="card-heading card-heading--stack">
         <span className="eyebrow">会议规则</span>
         <h3>{venue.shortName}</h3>

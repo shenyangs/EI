@@ -71,16 +71,33 @@ function badgeTone(status: OutlineSection["status"]) {
   return "rose" as const;
 }
 
+function buildStatusSummary(outline: OutlineSection[]) {
+  return outline.reduce(
+    (summary, section) => {
+      if (section.status === "已锁定") {
+        summary.locked += 1;
+      } else if (section.status === "草稿中") {
+        summary.drafting += 1;
+      } else {
+        summary.pending += 1;
+      }
+
+      return summary;
+    },
+    { locked: 0, drafting: 0, pending: 0 }
+  );
+}
+
 const OUTLINE_GENERATION_TIMEOUT_MS = 40000;
 function buildGeneratedPackages(projectTitle: string | undefined, abstract: string, keywords?: string[]) {
   return [
     {
       id: "package-1",
-      label: "博士开题版",
+      label: "结构主方案",
       title: projectTitle || "研究主题",
       abstract,
-      positioning: "基于选定研究方向的博士开题级别大纲",
-      recommendedReason: "符合博士开题要求，结构完整，逻辑严谨",
+      positioning: "基于选定研究方向生成的主框架方案",
+      recommendedReason: "结构完整，逻辑顺序清晰，适合作为后续写作基线",
       keywords: keywords && keywords.length > 0 ? keywords : ["研究主题", "研究方法", "创新点"]
     }
   ] satisfies TitlePackage[];
@@ -146,7 +163,7 @@ export function OutlineWorkbench({
         label: "默认版本",
         title: projectTitle || "研究主题",
         abstract: fallbackOutline.abstract,
-        positioning: "基于选定研究方向的博士开题级别大纲",
+        positioning: "基于选定研究方向的默认结构方案",
         recommendedReason: "虽然 AI 还没完整返回，但这版已经按你的题目和方向先搭好了可写的研究骨架。",
         keywords: fallbackOutline.keywords
       }
@@ -159,7 +176,7 @@ export function OutlineWorkbench({
     setMessage(nextMessage);
   }, [fallbackOutline.abstract, fallbackOutline.keywords, fallbackOutline.sections, projectTitle]);
 
-  // 从AI生成博士开题级别的详细大纲
+  // 从 AI 生成详细大纲
   useEffect(() => {
     if (!shouldGenerateOutline || useStreaming || !selectedDirection) {
       return;
@@ -261,6 +278,7 @@ export function OutlineWorkbench({
     () => packages.find((item) => item.id === selectedId) ?? packages[0],
     [packages, selectedId]
   );
+  const outlineStatus = useMemo(() => buildStatusSummary(outline), [outline]);
   const currentTitle = customTitle.trim() || selected?.title || "";
   const currentReviewKey = selected?.id ?? "unknown";
   const archiveKey = "outline";
@@ -343,22 +361,23 @@ export function OutlineWorkbench({
   if (loading && useStreaming && selectedDirection && projectTitle) {
     return (
       <div className="workbench-stack">
-        <section className="content-card">
+        <section className="content-card stitch-panel decision-loading-card">
           <div className="card-heading card-heading--stack">
             <span className="eyebrow">第三步</span>
-            <h3>AI 正在生成博士开题级别的详细大纲...</h3>
+            <h3>AI 正在生成详细论文框架...</h3>
           </div>
-          <p style={{ marginTop: '12px', fontSize: '0.875rem', color: '#6b7280', textAlign: 'center' }}>
-            如果等待时间过长，您可以使用默认大纲继续
+          <p className="decision-loading__hint">
+            如果等待时间过长，你也可以先用默认框架继续，不会卡住后续写作。
           </p>
-          <button 
-            className="secondary-button" 
-            style={{ marginTop: '20px', marginBottom: '20px', display: 'block', marginLeft: 'auto', marginRight: 'auto' }}
-            onClick={() => applyDefaultOutline("已切换到默认大纲，你可以先继续编辑，稍后再重新生成。")}
-            type="button"
-          >
-            使用默认大纲
-          </button>
+          <div className="button-row decision-loading__actions">
+            <button
+              className="secondary-button"
+              onClick={() => applyDefaultOutline("已切换到默认大纲，你可以先继续编辑，稍后再重新生成。")}
+              type="button"
+            >
+              使用默认大纲
+            </button>
+          </div>
           <StreamingAiPanel
             taskType="outline_generation"
             context={{
@@ -391,22 +410,21 @@ export function OutlineWorkbench({
   if (loading) {
     return (
       <div className="workbench-stack">
-        <section className="content-card">
+        <section className="content-card stitch-panel decision-loading-card">
           <div className="card-heading card-heading--stack">
             <span className="eyebrow">第三步</span>
-            <h3>AI 正在生成博士开题级别的详细大纲...</h3>
+            <h3>AI 正在生成详细论文框架...</h3>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 0' }}>
+          <div className="decision-loading">
             <div className="loading-spinner"></div>
-            <p className="lead-text" style={{ marginTop: '20px', textAlign: 'center' }}>
-              系统正在根据您选择的研究方向生成博士开题级别的详细大纲，请稍候...
+            <p className="lead-text">
+              系统正在根据你选择的研究方向生成详细论文框架，请稍候...
             </p>
-            <p style={{ marginTop: '12px', fontSize: '0.875rem', color: '#6b7280', textAlign: 'center' }}>
-              如果等待时间过长，您可以使用默认大纲继续
+            <p className="decision-loading__hint">
+              如果等待时间过长，你也可以先用默认框架继续。
             </p>
-            <button 
-              className="secondary-button" 
-              style={{ marginTop: '20px' }}
+            <button
+              className="secondary-button"
               onClick={() => applyDefaultOutline("已切换到默认大纲，你可以先继续编辑，稍后再重新生成。")}
               type="button"
             >
@@ -429,6 +447,11 @@ export function OutlineWorkbench({
   const currentFingerprint = createArchiveFingerprint([selected.id, currentTitle, abstractNote]);
   const archiveRecord = getRecord(archiveKey);
   const isCurrentArchived = matchesCurrent(archiveKey, currentFingerprint);
+  const archiveStateLabel = isReady
+    ? isCurrentArchived
+      ? "已形成稳定结构基线"
+      : "还需要确认并存档"
+    : "正在读取存档状态";
 
   async function handleArchive() {
     const localRecord = archiveCurrent({
@@ -480,13 +503,13 @@ export function OutlineWorkbench({
 
   return (
     <div className="workbench-stack">
-      <section className="content-card content-card--accent">
+      <section className="content-card content-card--accent stitch-panel">
         <div className="card-heading card-heading--stack">
           <span className="eyebrow">第三步</span>
           <h3>先定一套框架包，再进入正文写作。</h3>
         </div>
         <p className="lead-text">
-          移动版把框架页拆成 4 段：先看当前采用的方案，再切换框架包，再微调标题和摘要提醒，最后看章节骨架和存档。
+          这页先让你确认当前采用的框架包，再决定要不要微调标题、摘要提醒和章节骨架。真正要锁住的是“这一版结构”，而不是只看几个候选方案。
         </p>
         <div className="selection-spotlight top-gap">
           <div>
@@ -505,111 +528,166 @@ export function OutlineWorkbench({
         </div>
       </section>
 
-      <section className="content-card">
-        <div className="card-heading card-heading--stack">
-          <span className="eyebrow">标题与摘要方案</span>
-          <h3>AI 先出 3 套可直接采用的框架包</h3>
-        </div>
-        <div className="stack-list">
-          {packages.map((item) => {
-            const isActive = item.id === selected.id;
-
-            return (
-              <button
-                key={item.id}
-                className={isActive ? "choice-card choice-card--active" : "choice-card"}
-                onClick={() => setSelectedId(item.id)}
-                type="button"
-              >
-                <div className="line-item__head">
-                  <strong>{item.label}</strong>
-                  <StatusBadge tone={isActive ? "sage" : "default"}>
-                    {isActive ? "当前采用" : "点我切换"}
-                  </StatusBadge>
-                </div>
-                <p className="choice-card__title">{item.title}</p>
-                <p>{item.positioning}</p>
-              </button>
-            );
-          })}
-        </div>
-      </section>
-
-      <div className="project-page-grid">
-        <section className="content-card anchor-section" id="outline-packages">
+      <div className="outline-workbench-grid">
+        <section className="content-card stitch-panel anchor-section" id="outline-packages">
           <div className="card-heading card-heading--stack">
-            <span className="eyebrow">当前框架包</span>
-            <h3>这套内容已经够你继续往下写</h3>
+            <span className="eyebrow">框架包列表</span>
+            <h3>先选当前要推进的结构版本</h3>
           </div>
           <div className="stack-list">
-            <div className="line-item line-item--column">
-              <strong>当前标题</strong>
-              <p>{currentTitle}</p>
-            </div>
-            <div className="line-item line-item--column">
-              <strong>摘要草稿</strong>
-              <p>{selected.abstract}</p>
-            </div>
-            <div className="line-item line-item--column">
-              <strong>为什么推荐</strong>
-              <p>{selected.recommendedReason}</p>
-            </div>
-          </div>
-          <div className="button-row top-gap">
-            <button className="secondary-button" onClick={() => void runPackageCheck()} type="button">
-              {reviewLoading ? "检查中..." : "重新检查标题摘要"}
-            </button>
+            {packages.map((item) => {
+              const isActive = item.id === selected.id;
+
+              return (
+                <button
+                  key={item.id}
+                  className={isActive ? "choice-card choice-card--active" : "choice-card"}
+                  onClick={() => setSelectedId(item.id)}
+                  type="button"
+                >
+                  <div className="line-item__head">
+                    <strong>{item.label}</strong>
+                    <StatusBadge tone={isActive ? "sage" : "default"}>
+                      {isActive ? "当前采用" : "切换到此方案"}
+                    </StatusBadge>
+                  </div>
+                  <p className="choice-card__title">{item.title}</p>
+                  <p>{item.positioning}</p>
+                </button>
+              );
+            })}
           </div>
         </section>
 
-        <section className="content-card anchor-section" id="outline-editing">
+        <div className="decision-dossier">
+          <section className="content-card stitch-panel">
+            <div className="card-heading card-heading--stack">
+              <span className="eyebrow">结构概览</span>
+              <h3>这套内容已经够你继续往下写</h3>
+            </div>
+            <div className="decision-metrics">
+              <div className="decision-metric">
+                <span>章节节点</span>
+                <strong>{outline.length}</strong>
+                <p>已经拆成可直接进入写作的结构骨架。</p>
+              </div>
+              <div className="decision-metric">
+                <span>已锁定章节</span>
+                <strong>{outlineStatus.locked}</strong>
+                <p>这些部分后面应尽量保持结构稳定。</p>
+              </div>
+              <div className="decision-metric">
+                <span>存档状态</span>
+                <strong>{archiveStateLabel}</strong>
+                <p>定稿后再进入逐章写作，后面更不容易跑偏。</p>
+              </div>
+            </div>
+            <div className="stack-list top-gap">
+              <div className="line-item line-item--column">
+                <strong>当前标题</strong>
+                <p>{currentTitle}</p>
+              </div>
+              <div className="line-item line-item--column">
+                <strong>摘要草稿</strong>
+                <p>{selected.abstract}</p>
+              </div>
+              <div className="line-item line-item--column">
+                <strong>为什么推荐</strong>
+                <p>{selected.recommendedReason}</p>
+              </div>
+            </div>
+            <div className="button-row top-gap">
+              <button className="secondary-button" onClick={() => void runPackageCheck()} type="button">
+                {reviewLoading ? "检查中..." : "重新检查标题摘要"}
+              </button>
+            </div>
+          </section>
+
+          <section className="content-card stitch-panel anchor-section" id="outline-editing">
+            <div className="card-heading card-heading--stack">
+              <span className="eyebrow">人工校准</span>
+              <h3>如果标题或摘要方向不顺手，可以先在这里微调</h3>
+            </div>
+            <div className="form-grid">
+              <div className="field field--full">
+                <span>手动改标题</span>
+                <input
+                  onChange={(event) => setCustomTitle(event.target.value)}
+                  placeholder={selected.title}
+                  value={customTitle}
+                />
+              </div>
+              <div className="field field--full">
+                <span>给摘要一个修改提醒</span>
+                <textarea
+                  onChange={(event) => setCustomAbstractNote(event.target.value)}
+                  placeholder="例如：摘要结果句要更克制，别写得像结题报告。"
+                  rows={3}
+                  value={customAbstractNote}
+                />
+              </div>
+            </div>
+            <div className="hint-panel top-gap">
+              <strong>系统反馈</strong>
+              <p>{message}</p>
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <div className="outline-insight-grid">
+        <QualityReviewPanel
+          actionContext={{
+            scope: "outline",
+            projectId,
+            sections: outline.map((section) => ({
+              id: section.id,
+              title: section.title
+            })),
+            venueId
+          }}
+          emptyText="当前框架包生成后，系统会自动检查标题、摘要长度、结构和会议适配度。"
+          loading={reviewLoading}
+          report={reviewMap[currentReviewKey] ?? null}
+          title="标题摘要 AI 自检"
+        />
+
+        <section className="content-card stitch-panel">
           <div className="card-heading card-heading--stack">
-            <span className="eyebrow">允许你改</span>
-            <h3>如果标题或摘要方向不顺手，可以先在这里微调</h3>
+            <span className="eyebrow">结构状态</span>
+            <h3>现在这套框架还差哪几处补齐</h3>
           </div>
-          <div className="form-grid">
-            <div className="field field--full">
-              <span>手动改标题</span>
-              <input
-                onChange={(event) => setCustomTitle(event.target.value)}
-                placeholder={selected.title}
-                value={customTitle}
-              />
+          <div className="decision-metrics">
+            <div className="decision-metric">
+              <span>草稿中</span>
+              <strong>{outlineStatus.drafting}</strong>
+              <p>这些章节优先补结构和目标描述。</p>
             </div>
-            <div className="field field--full">
-              <span>给摘要一个修改提醒</span>
-              <textarea
-                onChange={(event) => setCustomAbstractNote(event.target.value)}
-                placeholder="例如：摘要结果句要更克制，别写得像结题报告。"
-                rows={3}
-                value={customAbstractNote}
-              />
+            <div className="decision-metric">
+              <span>待补充</span>
+              <strong>{outlineStatus.pending}</strong>
+              <p>这些章节后面最容易拖慢写作节奏。</p>
+            </div>
+            <div className="decision-metric">
+              <span>关键词数</span>
+              <strong>{selected.keywords.length}</strong>
+              <p>后面引言和摘要要围绕这些关键词展开。</p>
             </div>
           </div>
-          <div className="hint-panel top-gap">
-            <strong>系统反馈</strong>
-            <p>{message}</p>
+          <div className="stack-list top-gap">
+            <div className="line-item line-item--column">
+              <strong>建议先处理</strong>
+              <p>优先把“待补充”的章节补成可写状态，再去润色已经锁定的章节。</p>
+            </div>
+            <div className="line-item line-item--column">
+              <strong>进入正文前的最低标准</strong>
+              <p>每一章都要至少说清“这一章为什么存在、准备写什么、顺序为什么这样排”。</p>
+            </div>
           </div>
         </section>
       </div>
 
-      <QualityReviewPanel
-        actionContext={{
-          scope: "outline",
-          projectId,
-          sections: outline.map((section) => ({
-            id: section.id,
-            title: section.title
-          })),
-          venueId
-        }}
-        emptyText="当前框架包生成后，系统会自动检查标题、摘要长度、结构和会议适配度。"
-        loading={reviewLoading}
-        report={reviewMap[currentReviewKey] ?? null}
-        title="标题摘要 AI 自检"
-      />
-
-      <section className="content-card anchor-section" id="outline-structure">
+      <section className="content-card stitch-panel anchor-section" id="outline-structure">
         <div className="card-heading card-heading--stack">
           <span className="eyebrow">章节骨架</span>
           <h3>每章写什么，AI 也应该提前拆给你看</h3>
@@ -627,7 +705,7 @@ export function OutlineWorkbench({
                 <div className="outline-item__index">0{index + 1}</div>
                 <div className="outline-item__body">
                   {isEditing ? (
-                    <div>
+                    <div className="outline-section-editor">
                       <div className="field">
                         <span>章节标题</span>
                         <input
@@ -669,9 +747,9 @@ export function OutlineWorkbench({
                           rows={3}
                         />
                       </div>
-                      <div className="button-row top-gap">
-                        <button 
-                          className="secondary-button"
+                      <div className="outline-edit-actions top-gap">
+                        <button
+                          className="small-button"
                           onClick={() => {
                             setEditingSection(null);
                             setEditedSections(prev => {
@@ -680,11 +758,12 @@ export function OutlineWorkbench({
                               return newEdited;
                             });
                           }}
+                          type="button"
                         >
                           取消
                         </button>
-                        <button 
-                          className="primary-button"
+                        <button
+                          className="small-button"
                           onClick={() => {
                             setOutline(prev => prev.map(s => 
                               s.id === section.id 
@@ -698,6 +777,7 @@ export function OutlineWorkbench({
                               return newEdited;
                             });
                           }}
+                          type="button"
                         >
                           保存修改
                         </button>
@@ -707,12 +787,12 @@ export function OutlineWorkbench({
                     <>
                       <div className="outline-item__head">
                         <strong>{edited.title || section.title}</strong>
-                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <div className="outline-edit-actions">
                           <StatusBadge tone={badgeTone(section.status)}>{section.status}</StatusBadge>
-                          <button 
-                            className="secondary-button"
-                            style={{ fontSize: '0.84rem', padding: '4px 8px', minHeight: '32px' }}
+                          <button
+                            className="small-button"
                             onClick={() => setEditingSection(section.id)}
+                            type="button"
                           >
                             编辑
                           </button>
@@ -729,7 +809,7 @@ export function OutlineWorkbench({
         </div>
         <div className="hint-panel top-gap">
           <strong>AI 引导建议</strong>
-          <p>修改章节内容后，AI 会分析你的修改并提供建议，帮助你完善大纲结构，确保符合博士开题要求。</p>
+          <p>修改章节内容后，AI 会分析你的调整并给出结构建议，帮助你把后面的写作入口先稳定下来。</p>
         </div>
       </section>
 
@@ -772,7 +852,7 @@ export function OutlineWorkbench({
             )}
           </div>
         }
-        title="框架不是看一眼就算，得把这一版正式锁住"
+        title="框架不能只是看过，得把这一版正式锁住"
       />
 
       <VersionHistoryPanel

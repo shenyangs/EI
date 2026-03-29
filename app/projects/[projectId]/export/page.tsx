@@ -45,19 +45,26 @@ export default async function ExportPage({
   const priorityAction = getPriorityReviewAction(staticIssues, reviewContext);
 
   return (
-    <div className="workbench-stack">
-      <section className="content-card content-card--accent">
-        <div className="card-heading card-heading--stack">
-          <span className="eyebrow">第五步</span>
-          <h3>全文页先把完整稿摆出来，再决定是否定稿。</h3>
+    <div className="workbench-stack export-page export-page--stitch">
+      <section className="decision-stage-hero">
+        <div className="decision-stage-hero__main">
+          <span className="eyebrow">Final Review</span>
+          <h2>先通读完整稿，再决定这是不是当前要冻结的导出版本。</h2>
+          <p>
+            全文页负责做最后一轮全局检查。这里要解决的不是“还能不能继续改”，而是“当前这一版能不能作为正式导出基线”。
+          </p>
         </div>
-        <p className="lead-text">
-          移动版把“通读全文”“看自检结果”“确认并存档”拆成顺序明确的单列流程，避免一上来只看到零散检查项。
-        </p>
+        <aside className="decision-stage-hero__rail">
+          <div className="stitch-brief-card">
+            <span className="eyebrow">当前稿件状态</span>
+            <strong>{project.title}</strong>
+            <p>当前全文已经合成为一版完整稿，接下来重点是检查结构、风险和导出格式。</p>
+          </div>
+        </aside>
       </section>
 
-      <div className="project-page-grid">
-        <section className="content-card">
+      <div className="project-page-grid export-support-grid">
+        <section className="content-card stitch-panel">
           <div className="card-heading card-heading--stack">
             <span className="eyebrow">导出前检查</span>
             <h3>该改的地方也一起明说</h3>
@@ -110,7 +117,7 @@ export default async function ExportPage({
           ) : null}
         </section>
 
-        <section className="content-card">
+        <section className="content-card stitch-panel">
           <div className="card-heading card-heading--stack">
             <span className="eyebrow">当前稿件状态</span>
             <h3>这一版已经接近可导出</h3>

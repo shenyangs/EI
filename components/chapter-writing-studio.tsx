@@ -1,11 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { streamAiTask, StreamingAiProcessor } from "@/lib/streaming-ai";
+import { useMemo, useState, useTransition } from "react";
 
-import { ProjectNav } from "@/components/project-nav";
 import { VenueRuleSelector } from "@/components/venue-rule-selector";
+import type {
+  AssetItem,
+  ChapterDraft,
+  CheckItem,
+  ReferenceItem
+} from "@/lib/demo-data";
 import { buildVenueHref, VenueProfile } from "@/lib/venue-profiles";
 
 type DraftResponse = {
@@ -25,14 +29,6 @@ async function requestDraft(prompt: string) {
 
   return (await response.json()) as DraftResponse;
 }
-
-type Chapter = {
-  id: string;
-  title: string;
-  status: string;
-  goal: string;
-  summary: string;
-};
 
 type AiAnalysis = {
   content: string;
@@ -63,7 +59,10 @@ type ChapterWritingStudioProps = {
   projectId: string;
   projectTitle: string;
   venueProfile: VenueProfile;
-  chapters: Chapter[];
+  chapters: ChapterDraft[];
+  references: ReferenceItem[];
+  assets: AssetItem[];
+  checks: CheckItem[];
   initialChapterId: string | undefined;
   venueId: string | undefined;
 };
@@ -73,30 +72,25 @@ export function ChapterWritingStudio({
   projectTitle,
   venueProfile,
   chapters,
+  references,
+  assets,
+  checks,
   initialChapterId,
   venueId
 }: ChapterWritingStudioProps) {
   const [activeChapterId, setActiveChapterId] = useState(initialChapterId || chapters[0]?.id || "");
-  const [activeParagraphIndex, setActiveParagraphIndex] = useState(0);
+  const [, setActiveParagraphIndex] = useState(0);
   const [customInstruction, setCustomInstruction] = useState("");
-  const [isStreaming, setIsStreaming] = useState(false);
-  const [streamingResult, setStreamingResult] = useState("");
   const [message, setMessage] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
   const [isChecking, setIsChecking] = useState(false);
   const [aiAnalysisMap, setAiAnalysisMap] = useState<Record<string, AiAnalysis>>({});
-  const [isReviewing, setIsReviewing] = useState(false);
-  const [reviewResult, setReviewResult] = useState<{
-    suggestions: string[];
-    rating: number;
-  } | null>(null);
-  const [draftMap, setDraftMap] = useState<Record<string, string[]>>({});
   const [showAiAnalysis, setShowAiAnalysis] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [draftMap, setDraftMap] = useState<Record<string, string[]>>(() =>
+    Object.fromEntries(chapters.map((chapter) => [chapter.id, chapter.paragraphs]))
+  );
   
   const [, startTransition] = useTransition();
-  const abortControllerRef = useRef<AbortController | null>(null);
-  const [streamingProcessor, setStreamingProcessor] = useState<StreamingAiProcessor | null>(null);
 
   const activeChapter = chapters.find((chapter) => chapter.id === activeChapterId);
   const activeParagraphs = useMemo(() => draftMap[activeChapterId] ?? [], [draftMap, activeChapterId]);
@@ -410,458 +404,332 @@ ${content}
   }
 
   return (
-    <>
-      <ProjectNav projectId={projectId} />
-
-      <main className="project-main">
-        <section className="hero-card hero-card--compact">
-          <div className="page-intro page-intro--stack">
-            <div>
-              <span className="eyebrow">第四步</span>
-              <h1>章节写作工作室</h1>
-              <p>为每个章节生成和完善内容，确保符合学术标准和会议要求。</p>
-            </div>
-            <Link
-              className="secondary-button"
-              href={buildVenueHref(`/projects/${projectId}/outline`, venueProfile.id)}
+    <section className="writing-studio-layout">
+      <aside className="content-card stitch-panel writing-studio-sidebar">
+        <div className="card-heading card-heading--stack">
+          <span className="eyebrow">章节导航</span>
+          <h2>当前写作章节</h2>
+          <p>一次只处理一个章节，减少在多个章节之间来回跳转的负担。</p>
+        </div>
+        <div className="chapter-selector">
+          {chapters.map((chapter) => (
+            <button
+              key={chapter.id}
+              className={`chapter-button ${chapter.id === activeChapterId ? "active" : ""}`}
+              onClick={() => setActiveChapterId(chapter.id)}
+              type="button"
             >
-              返回大纲
-            </Link>
-          </div>
-        </section>
+              <span className="chapter-title">{chapter.title}</span>
+              <span className="chapter-status">{chapter.status}</span>
+            </button>
+          ))}
+        </div>
 
-        {/* 章节选择器 */}
-        <section className="content-card">
-          <div className="card-heading">
-            <h2>章节管理</h2>
-          </div>
-          <div className="chapter-selector">
-            {chapters.map((chapter) => (
-              <button
-                key={chapter.id}
-                className={`chapter-button ${chapter.id === activeChapterId ? "active" : ""}`}
-                onClick={() => setActiveChapterId(chapter.id)}
-              >
-                <span className="chapter-title">{chapter.title}</span>
-                <span className="chapter-status">{chapter.status}</span>
-              </button>
+        <div className="hint-panel top-gap">
+          <strong>当前章节目标</strong>
+          <p>{activeChapter?.goal || "先从左侧选择一个章节。"}</p>
+        </div>
+        <div className="hint-panel">
+          <strong>当前章节摘要</strong>
+          <p>{activeChapter?.summary || "选中章节后，这里会显示本章摘要。"}</p>
+        </div>
+        <div className="hint-panel">
+          <strong>AI 当前可帮你做的事</strong>
+          <ul className="bullet-list">
+            {(activeChapter?.aiOptions ?? []).map((item) => (
+              <li key={item}>{item}</li>
             ))}
-          </div>
-        </section>
+          </ul>
+        </div>
+      </aside>
 
-        {/* 章节编辑器 */}
-        <section className="content-card">
-          <div className="card-heading">
-            <h2>{activeChapter?.title || "章节内容"}</h2>
-            <p>{activeChapter?.goal || ""}</p>
-          </div>
+      <section className="content-card stitch-panel writing-studio-main">
+        <div className="card-heading card-heading--stack">
+          <span className="eyebrow">正文工作区</span>
+          <h2>{activeChapter?.title || "章节内容"}</h2>
+          <p>{activeChapter?.goal || "先选择章节，再开始写作或修改。"}</p>
+        </div>
 
-          {isChapterEmpty ? (
-            <div className="empty-chapter">
-              <p>章节内容为空，点击下方按钮生成内容。</p>
-              <button
-                className="primary-button"
-                onClick={generateChapterContent}
-                disabled={isGenerating}
-              >
-                {isGenerating ? "生成中..." : "AI 生成章节内容"}
-              </button>
-            </div>
-          ) : (
-            <div className="chapter-editor">
-              {/* 段落编辑器 */}
-              <div className="paragraphs">
-                {activeParagraphs.map((paragraph, index) => (
-                  <div key={index} className="paragraph">
-                    <textarea
-                      value={paragraph}
-                      onChange={(e) => {
+        <div className="writing-toolbar">
+          <Link
+            className="secondary-button"
+            href={buildVenueHref(`/projects/${projectId}/outline`, venueId)}
+          >
+            返回论文框架
+          </Link>
+          <Link
+            className="secondary-button"
+            href={buildVenueHref(`/projects/${projectId}/export`, venueId)}
+          >
+            查看全文页
+          </Link>
+        </div>
+
+        {isChapterEmpty ? (
+          <div className="empty-chapter">
+            <p>当前章节还没有正文，先让系统生成一个可修改的初稿，再继续人工调整。</p>
+            <button
+              className="primary-button"
+              onClick={generateChapterContent}
+              disabled={isGenerating}
+              type="button"
+            >
+              {isGenerating ? "生成中..." : "AI 生成章节内容"}
+            </button>
+          </div>
+        ) : (
+          <div className="chapter-editor">
+            <div className="paragraphs">
+              {activeParagraphs.map((paragraph, index) => (
+                <div key={`${activeChapterId}-${index}`} className="paragraph">
+                  <textarea
+                    value={paragraph}
+                    onChange={(e) => {
+                      const newParagraphs = [...activeParagraphs];
+                      newParagraphs[index] = e.target.value;
+                      setDraftMap((current) => ({
+                        ...current,
+                        [activeChapterId]: newParagraphs
+                      }));
+                    }}
+                    placeholder="输入段落内容..."
+                  />
+                  <div className="paragraph-actions">
+                    <button
+                      className="small-button"
+                      onClick={() => {
                         const newParagraphs = [...activeParagraphs];
-                        newParagraphs[index] = e.target.value;
+                        newParagraphs.splice(index + 1, 0, "");
                         setDraftMap((current) => ({
                           ...current,
                           [activeChapterId]: newParagraphs
                         }));
+                        setActiveParagraphIndex(index + 1);
                       }}
-                      placeholder="输入段落内容..."
-                    />
-                    <div className="paragraph-actions">
+                      type="button"
+                    >
+                      在下方插入
+                    </button>
+                    {activeParagraphs.length > 1 ? (
                       <button
-                        className="small-button"
+                        className="small-button delete-button"
                         onClick={() => {
                           const newParagraphs = [...activeParagraphs];
-                          newParagraphs.splice(index + 1, 0, "");
+                          newParagraphs.splice(index, 1);
                           setDraftMap((current) => ({
                             ...current,
                             [activeChapterId]: newParagraphs
                           }));
-                          setActiveParagraphIndex(index + 1);
+                          setActiveParagraphIndex(Math.max(0, index - 1));
                         }}
+                        type="button"
                       >
-                        在下方插入
+                        删除
                       </button>
-                      {activeParagraphs.length > 1 && (
-                        <button
-                          className="small-button delete-button"
-                          onClick={() => {
-                            const newParagraphs = [...activeParagraphs];
-                            newParagraphs.splice(index, 1);
-                            setDraftMap((current) => ({
-                              ...current,
-                              [activeChapterId]: newParagraphs
-                            }));
-                            setActiveParagraphIndex(Math.max(0, index - 1));
-                          }}
-                        >
-                          删除
-                        </button>
-                      )}
-                    </div>
+                    ) : null}
                   </div>
-                ))}
-              </div>
+                </div>
+              ))}
+            </div>
 
-              {/* 操作按钮 */}
-              <div className="editor-actions">
-                <button
-                  className="secondary-button"
-                  onClick={() => {
-                    const newParagraphs = [...activeParagraphs, ""];
-                    setDraftMap((current) => ({
-                      ...current,
-                      [activeChapterId]: newParagraphs
-                    }));
-                    setActiveParagraphIndex(newParagraphs.length - 1);
-                  }}
-                >
-                  添加段落
-                </button>
-                <button
-                  className="secondary-button"
-                  onClick={regenerateCurrentChapter}
-                  disabled={isGenerating}
-                >
-                  {isGenerating ? "重新生成中..." : "重新生成章节"}
-                </button>
-                <button
-                  className="primary-button"
-                  onClick={() => runChapterCheck(
+            <div className="editor-actions">
+              <button
+                className="secondary-button"
+                onClick={() => {
+                  const newParagraphs = [...activeParagraphs, ""];
+                  setDraftMap((current) => ({
+                    ...current,
+                    [activeChapterId]: newParagraphs
+                  }));
+                  setActiveParagraphIndex(newParagraphs.length - 1);
+                }}
+                type="button"
+              >
+                添加段落
+              </button>
+              <button
+                className="secondary-button"
+                onClick={regenerateCurrentChapter}
+                disabled={isGenerating}
+                type="button"
+              >
+                {isGenerating ? "重新生成中..." : "重新生成章节"}
+              </button>
+              <button
+                className="primary-button"
+                onClick={() =>
+                  runChapterCheck(
                     activeChapterId,
                     activeParagraphs,
                     activeChapter?.goal || "",
                     activeChapter?.title || ""
                   )}
-                  disabled={isChecking}
-                >
-                  {isChecking ? "检查中..." : "检查章节质量"}
-                </button>
-              </div>
-
-              {/* 自定义修改指令 */}
-              <div className="custom-instruction">
-                <label htmlFor="custom-instruction">自定义修改要求</label>
-                <textarea
-                  id="custom-instruction"
-                  value={customInstruction}
-                  onChange={(e) => setCustomInstruction(e.target.value)}
-                  placeholder="例如：增加实证案例，强化理论分析，调整结构..."
-                  rows={3}
-                />
-                <button
-                  className="secondary-button"
-                  onClick={applyCustomInstruction}
-                  disabled={!customInstruction.trim()}
-                >
-                  按要求修改
-                </button>
-              </div>
+                disabled={isChecking}
+                type="button"
+              >
+                {isChecking ? "检查中..." : "检查章节质量"}
+              </button>
             </div>
-          )}
 
-          {/* 消息提示 */}
-          {message && (
-            <div className="message">
-              <p>{message}</p>
+            <div className="custom-instruction">
+              <label htmlFor="custom-instruction">自定义修改要求</label>
+              <textarea
+                id="custom-instruction"
+                value={customInstruction}
+                onChange={(e) => setCustomInstruction(e.target.value)}
+                placeholder="例如：增加实证案例，强化理论分析，收束结论语气..."
+                rows={3}
+              />
+              <button
+                className="secondary-button"
+                onClick={applyCustomInstruction}
+                disabled={!customInstruction.trim()}
+                type="button"
+              >
+                按要求修改
+              </button>
             </div>
-          )}
+          </div>
+        )}
 
-          {/* AI 分析结果 */}
-          {showAiAnalysis && aiAnalysisMap[activeChapterId] && (
-            <div className="ai-analysis">
-              <div className="ai-analysis-header">
-                <h3>AI 分析结果</h3>
-                <button
-                  className="small-button"
-                  onClick={() => setShowAiAnalysis(false)}
-                >
-                  关闭
-                </button>
-              </div>
-              <div className="stack-list">
-                <div className="line-item line-item--column">
-                  <strong>质量评估</strong>
-                  <div style={{ 
-                    backgroundColor: aiAnalysisMap[activeChapterId].quality.approved ? '#e8f5e8' : '#ffebee', 
-                    padding: '12px', 
-                    borderRadius: '8px', 
-                    marginBottom: '12px'
-                  }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <strong>整体评分：</strong>{aiAnalysisMap[activeChapterId].quality.overallScore}/100
-                      <span style={{ 
-                        padding: '4px 12px', 
-                        borderRadius: '16px', 
-                        backgroundColor: aiAnalysisMap[activeChapterId].quality.approved ? '#4caf50' : '#f44336', 
-                        color: 'white',
-                        fontSize: '12px'
-                      }}>
-                        {aiAnalysisMap[activeChapterId].quality.approved ? '通过' : '需改进'}
-                      </span>
-                    </div>
-                  </div>
-                  
-                  <div className="quality-criteria">
-                    {aiAnalysisMap[activeChapterId].quality.criteria.map((criterion, index) => (
-                      <div key={index} className="criterion">
-                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                          <span>{criterion.name}</span>
-                          <span>{criterion.score}/100</span>
-                        </div>
-                        <div className="progress-bar">
-                          <div 
-                            className="progress-fill"
-                            style={{ 
-                              width: `${(criterion.score / 100) * 100}%`,
-                              backgroundColor: criterion.score >= 70 ? '#4caf50' : criterion.score >= 40 ? '#ff9800' : '#f44336'
-                            }}
-                          />
-                        </div>
-                        <p style={{ fontSize: '14px', color: '#666', marginTop: '4px' }}>{criterion.feedback}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                
-                <div className="line-item line-item--column">
-                  <strong>改进建议</strong>
-                  <ul className="suggestions-list">
-                    {aiAnalysisMap[activeChapterId].quality.suggestions.map((suggestion, index) => (
-                      <li key={index}>{suggestion}</li>
-                    ))}
-                  </ul>
-                </div>
-                
-                <div className="line-item line-item--column">
-                  <strong>章节统计</strong>
-                  <div className="chapter-stats">
-                    <span>字数：{aiAnalysisMap[activeChapterId].metadata.wordCount}</span>
-                    <span>阅读时间：{aiAnalysisMap[activeChapterId].metadata.estimatedReadingTime}分钟</span>
-                    <span>主题：{aiAnalysisMap[activeChapterId].metadata.topics.join(', ')}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
+        {message ? (
+          <div className="message">
+            <p>{message}</p>
+          </div>
+        ) : null}
+      </section>
+
+      <aside className="content-card stitch-panel writing-studio-rail">
+        <div className="card-heading card-heading--stack">
+          <span className="eyebrow">质量与证据</span>
+          <h2>当前章节支持面板</h2>
+          <p>这里负责帮你判断这一章写得够不够稳，证据和引用有没有跟上。</p>
+        </div>
+
+        <section className="writing-side-card">
+          <strong>当前章节需要的证据</strong>
+          <ul className="bullet-list">
+            {(activeChapter?.evidenceNeeds ?? []).map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
         </section>
-      </main>
 
-      <style jsx>{`
-        .chapter-selector {
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-        }
+        <section className="writing-side-card">
+          <strong>当前项目引用</strong>
+          <div className="stack-list">
+            {references.map((item) => (
+              <div key={item.id} className="line-item line-item--column">
+                <strong>{item.title}</strong>
+                <span>{item.source}</span>
+                <span className="writing-inline-meta">{item.status}</span>
+              </div>
+            ))}
+          </div>
+        </section>
 
-        .chapter-button {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 12px 16px;
-          border: 1px solid #e0e0e0;
-          border-radius: 8px;
-          background: white;
-          cursor: pointer;
-          transition: all 0.2s;
-        }
+        <section className="writing-side-card">
+          <strong>可直接调用的图文材料</strong>
+          <div className="stack-list">
+            {assets.map((item) => (
+              <div key={item.id} className="line-item line-item--column">
+                <strong>{item.name}</strong>
+                <span>
+                  {item.type} · {item.usage}
+                </span>
+              </div>
+            ))}
+          </div>
+        </section>
 
-        .chapter-button:hover {
-          border-color: #3b82f6;
-        }
+        <section className="writing-side-card">
+          <strong>当前项目风险</strong>
+          <div className="stack-list">
+            {checks.map((item) => (
+              <div key={item.title} className="line-item line-item--column">
+                <strong>{item.title}</strong>
+                <span>{item.description}</span>
+                <span className="writing-inline-meta">{item.level}</span>
+              </div>
+            ))}
+          </div>
+        </section>
 
-        .chapter-button.active {
-          background: #eff6ff;
-          border-color: #3b82f6;
-        }
+        {showAiAnalysis && aiAnalysisMap[activeChapterId] ? (
+          <section className="ai-analysis">
+            <div className="ai-analysis-header">
+              <h3>AI 评估结果</h3>
+              <button
+                className="small-button"
+                onClick={() => setShowAiAnalysis(false)}
+                type="button"
+              >
+                关闭
+              </button>
+            </div>
 
-        .chapter-title {
-          font-weight: 500;
-        }
+            <div
+              className={
+                aiAnalysisMap[activeChapterId].quality.approved
+                  ? "analysis-scorecard analysis-scorecard--pass"
+                  : "analysis-scorecard analysis-scorecard--warn"
+              }
+            >
+              <div className="analysis-scorecard__head">
+                <strong>整体评分</strong>
+                <span>{aiAnalysisMap[activeChapterId].quality.overallScore}/100</span>
+              </div>
+              <span
+                className={
+                  aiAnalysisMap[activeChapterId].quality.approved
+                    ? "analysis-status analysis-status--pass"
+                    : "analysis-status analysis-status--warn"
+                }
+              >
+                {aiAnalysisMap[activeChapterId].quality.approved ? "通过" : "需改进"}
+              </span>
+            </div>
 
-        .chapter-status {
-          font-size: 12px;
-          padding: 2px 8px;
-          border-radius: 12px;
-          background: #f3f4f6;
-          color: #6b7280;
-        }
+            <div className="quality-criteria">
+              {aiAnalysisMap[activeChapterId].quality.criteria.map((criterion) => (
+                <div key={criterion.name} className="criterion">
+                  <div className="criterion__head">
+                    <span>{criterion.name}</span>
+                    <span>{criterion.score}/100</span>
+                  </div>
+                  <div className="progress-bar">
+                    <div
+                      className="progress-fill"
+                      style={{ width: `${criterion.score}%` }}
+                    />
+                  </div>
+                  <p className="criterion__feedback">{criterion.feedback}</p>
+                </div>
+              ))}
+            </div>
 
-        .empty-chapter {
-          text-align: center;
-          padding: 40px 20px;
-        }
+            <div className="writing-side-card writing-side-card--nested">
+              <strong>改进建议</strong>
+              <ul className="suggestions-list">
+                {aiAnalysisMap[activeChapterId].quality.suggestions.map((suggestion) => (
+                  <li key={suggestion}>{suggestion}</li>
+                ))}
+              </ul>
+            </div>
 
-        .empty-chapter p {
-          margin-bottom: 20px;
-          color: #6b7280;
-        }
+            <div className="chapter-stats">
+              <span>字数：{aiAnalysisMap[activeChapterId].metadata.wordCount}</span>
+              <span>阅读时间：{aiAnalysisMap[activeChapterId].metadata.estimatedReadingTime} 分钟</span>
+              <span>主题：{aiAnalysisMap[activeChapterId].metadata.topics.join(" / ") || "待分析"}</span>
+            </div>
+          </section>
+        ) : null}
 
-        .chapter-editor {
-          display: flex;
-          flex-direction: column;
-          gap: 20px;
-        }
-
-        .paragraphs {
-          display: flex;
-          flex-direction: column;
-          gap: 16px;
-        }
-
-        .paragraph {
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-        }
-
-        .paragraph textarea {
-          width: 100%;
-          padding: 12px;
-          border: 1px solid #e0e0e0;
-          border-radius: 8px;
-          resize: vertical;
-          min-height: 100px;
-        }
-
-        .paragraph-actions {
-          display: flex;
-          gap: 8px;
-          justify-content: flex-end;
-        }
-
-        .small-button {
-          padding: 4px 12px;
-          border: 1px solid #e0e0e0;
-          border-radius: 4px;
-          background: white;
-          cursor: pointer;
-          font-size: 12px;
-          transition: all 0.2s;
-        }
-
-        .small-button:hover {
-          background: #f3f4f6;
-        }
-
-        .small-button.delete-button {
-          color: #ef4444;
-          border-color: #fecaca;
-        }
-
-        .small-button.delete-button:hover {
-          background: #fef2f2;
-        }
-
-        .editor-actions {
-          display: flex;
-          gap: 12px;
-          justify-content: flex-end;
-        }
-
-        .custom-instruction {
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-        }
-
-        .custom-instruction textarea {
-          width: 100%;
-          padding: 12px;
-          border: 1px solid #e0e0e0;
-          border-radius: 8px;
-          resize: vertical;
-        }
-
-        .message {
-          margin-top: 16px;
-          padding: 12px;
-          background: #f3f4f6;
-          border-radius: 8px;
-          color: #374151;
-        }
-
-        .ai-analysis {
-          margin-top: 20px;
-          padding: 20px;
-          background: #f8f9fa;
-          border-radius: 8px;
-        }
-
-        .ai-analysis-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 16px;
-        }
-
-        .ai-analysis-header h3 {
-          margin: 0;
-        }
-
-        .quality-criteria {
-          display: flex;
-          flex-direction: column;
-          gap: 12px;
-          margin-top: 12px;
-        }
-
-        .criterion {
-          display: flex;
-          flex-direction: column;
-          gap: 4px;
-        }
-
-        .progress-bar {
-          width: 100%;
-          height: 6px;
-          background: #e5e7eb;
-          border-radius: 3px;
-          overflow: hidden;
-        }
-
-        .progress-fill {
-          height: 100%;
-          transition: width 0.3s ease;
-        }
-
-        .suggestions-list {
-          list-style: disc;
-          padding-left: 20px;
-          margin: 8px 0 0 0;
-        }
-
-        .suggestions-list li {
-          margin-bottom: 8px;
-        }
-
-        .chapter-stats {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 16px;
-          margin-top: 8px;
-          font-size: 14px;
-          color: #6b7280;
-        }
-      `}</style>
-    </>
+        <section className="writing-side-card">
+          <strong>当前会议规则</strong>
+          <VenueRuleSelector selectedVenueId={venueProfile.id} />
+        </section>
+      </aside>
+    </section>
   );
 }

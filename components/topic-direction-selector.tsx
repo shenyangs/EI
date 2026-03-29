@@ -35,6 +35,11 @@ function toneFromConfidence(confidence: string) {
   return "default" as const;
 }
 
+function parseConfidence(confidence: string) {
+  const parsed = Number.parseInt(confidence, 10);
+  return Number.isNaN(parsed) ? 0 : parsed;
+}
+
 export function TopicDirectionSelector({
   projectId,
   options: initialOptions,
@@ -173,6 +178,8 @@ export function TopicDirectionSelector({
 
   const selected = options.find((item) => item.id === selectedId) ?? options[0];
   const currentNote = customNote.trim();
+  const selectedConfidence = parseConfidence(selected?.confidence ?? "0");
+  const bestConfidence = options.reduce((max, item) => Math.max(max, parseConfidence(item.confidence)), 0);
   const archiveKey = "topic-direction";
   const {
     error: historyError,
@@ -185,14 +192,14 @@ export function TopicDirectionSelector({
   if (loading) {
     return (
       <div className="workbench-stack">
-        <section className="content-card">
+        <section className="content-card stitch-panel decision-loading-card">
           <div className="card-heading card-heading--stack">
             <span className="eyebrow">第二步</span>
             <h3>AI 正在分析您的研究主题，生成详细方向...</h3>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 0' }}>
+          <div className="decision-loading">
             <div className="loading-spinner"></div>
-            <p className="lead-text" style={{ marginTop: '20px', textAlign: 'center' }}>
+            <p className="lead-text">
               系统正在根据您的研究主题生成5个详细的研究方向，请稍候...
             </p>
           </div>
@@ -211,6 +218,11 @@ export function TopicDirectionSelector({
   const currentFingerprint = createArchiveFingerprint([selected.id, currentNote]);
   const archiveRecord = getRecord(archiveKey);
   const isCurrentArchived = matchesCurrent(archiveKey, currentFingerprint);
+  const archiveStateLabel = isReady
+    ? isCurrentArchived
+      ? "已建立稳定起点"
+      : "还需要确认一次"
+    : "正在读取存档状态";
 
   async function handleArchive() {
     const localRecord = archiveCurrent({
@@ -260,13 +272,13 @@ export function TopicDirectionSelector({
 
   return (
     <div className="workbench-stack">
-      <section className="content-card content-card--accent">
+      <section className="content-card content-card--accent stitch-panel">
         <div className="card-heading card-heading--stack">
           <span className="eyebrow">第二步</span>
           <h3>先从 AI 给出的路线里选一条，再决定要不要自己微调。</h3>
         </div>
         <p className="lead-text">
-          移动版先把当前选中的方向放在最上面，再把可选方案排在下面。你不用一边横向比较、一边来回找说明，顺着往下看就能完成这一页。
+          这一页的目标不是“多看几个方案”，而是明确选出一条后面要继续推进的研究路线。先看当前采用，再看可选方案，最后决定是否要自己补充方向说明。
         </p>
         <div className="selection-spotlight top-gap">
           <div>
@@ -287,84 +299,153 @@ export function TopicDirectionSelector({
         </div>
       </section>
 
-      <section className="content-card">
-        <div className="card-heading card-heading--stack">
-          <span className="eyebrow">AI 已备好 5 个方向</span>
-          <h3>你先选一个最符合你研究目标的方向</h3>
-        </div>
-        <div className="stack-list">
-          {options.map((option) => {
-            const isActive = option.id === selected.id;
-
-            return (
-              <button
-                key={option.id}
-                className={isActive ? "choice-card choice-card--active" : "choice-card"}
-                onClick={() => setSelectedId(option.id)}
-                type="button"
-              >
-                <div className="line-item__head">
-                  <strong>{option.label}</strong>
-                  <StatusBadge tone={toneFromConfidence(option.confidence)}>
-                    {option.confidence}
-                  </StatusBadge>
-                </div>
-                <p>{option.description}</p>
-                <div className="keyword-cluster top-gap">
-                  {option.readyOutputs.map((item) => (
-                    <span key={item} className="ghost-chip">
-                      {item}
-                    </span>
-                  ))}
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      </section>
-
-      <div className="project-page-grid">
-        <section className="content-card">
+      <div className="direction-workbench-grid">
+        <section className="content-card stitch-panel">
           <div className="card-heading card-heading--stack">
-            <span className="eyebrow">当前选中方案</span>
-            <h3>{selected.label}</h3>
+            <span className="eyebrow">AI 已备好 {options.length} 个方向</span>
+            <h3>先选一条最值得继续投入的研究路线</h3>
           </div>
           <div className="stack-list">
-            <div className="line-item line-item--column">
-              <strong>为什么适合</strong>
-              <ul className="bullet-list">
-                {selected.whyItFits.map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-            </div>
-            <div className="line-item line-item--column">
-              <strong>后面该怎么写</strong>
-              <ul className="bullet-list">
-                {selected.writingStrategy.map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-            </div>
+            {options.map((option) => {
+              const isActive = option.id === selected.id;
+
+              return (
+                <button
+                  key={option.id}
+                  className={isActive ? "choice-card choice-card--active" : "choice-card"}
+                  onClick={() => setSelectedId(option.id)}
+                  type="button"
+                >
+                  <div className="line-item__head">
+                    <strong>{option.label}</strong>
+                    <StatusBadge tone={toneFromConfidence(option.confidence)}>
+                      {option.confidence}
+                    </StatusBadge>
+                  </div>
+                  <p>{option.description}</p>
+                  <div className="keyword-cluster top-gap">
+                    {option.readyOutputs.map((item) => (
+                      <span key={item} className="ghost-chip">
+                        {item}
+                      </span>
+                    ))}
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </section>
 
-        <section className="content-card">
+        <div className="decision-dossier">
+          <section className="content-card stitch-panel">
+            <div className="card-heading card-heading--stack">
+              <span className="eyebrow">当前决策档案</span>
+              <h3>{selected.label}</h3>
+            </div>
+            <div className="decision-metrics">
+              <div className="decision-metric">
+                <span>方案信心</span>
+                <strong>{selectedConfidence}%</strong>
+                <p>AI 对当前方向的推荐强度。</p>
+              </div>
+              <div className="decision-metric">
+                <span>与最佳差距</span>
+                <strong>{Math.max(bestConfidence - selectedConfidence, 0)}%</strong>
+                <p>如果差距很小，说明这条路线已经足够稳。</p>
+              </div>
+              <div className="decision-metric">
+                <span>存档状态</span>
+                <strong>{archiveStateLabel}</strong>
+                <p>后面的框架页会直接继承这里的决定。</p>
+              </div>
+            </div>
+            <div className="stack-list top-gap">
+              <div className="line-item line-item--column">
+                <strong>为什么适合</strong>
+                <ul className="bullet-list">
+                  {selected.whyItFits.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+              <div className="line-item line-item--column">
+                <strong>后面该怎么写</strong>
+                <ul className="bullet-list">
+                  {selected.writingStrategy.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </section>
+
+          <section className="content-card stitch-panel">
+            <div className="card-heading card-heading--stack">
+              <span className="eyebrow">人工校准</span>
+              <h3>如果不想完全照着 AI 方案走，就在这里补一句方向说明</h3>
+            </div>
+            <div className="field field--full">
+              <textarea
+                onChange={(event) => setCustomNote(event.target.value)}
+                placeholder="例如：我想保留设计实践主线，但用户测试部分要写得更重，结果章要突出情感识别度。"
+                rows={4}
+                value={customNote}
+              />
+            </div>
+            <div className="hint-panel top-gap">
+              <strong>系统反馈</strong>
+              <p>{statusMessage}</p>
+            </div>
+            <div className="decision-guidance-list top-gap">
+              <div className="decision-guidance-item">
+                <strong>这一步真正要定什么</strong>
+                <p>先定研究路线，不是先纠结标题写法。</p>
+              </div>
+              <div className="decision-guidance-item">
+                <strong>什么时候该自己改</strong>
+                <p>当你的研究对象、方法比 AI 给出的方案更明确时，再补人工说明。</p>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <div className="project-page-grid">
+        <section className="content-card stitch-panel">
           <div className="card-heading card-heading--stack">
-            <span className="eyebrow">你也可以直接改</span>
-            <h3>如果不想完全照着 AI 方案走，就在这里补一句方向说明</h3>
+            <span className="eyebrow">当前路线将直接产出</span>
+            <h3>这条方向后面会带出哪些写作成果</h3>
           </div>
-          <div className="field field--full">
-            <textarea
-              onChange={(event) => setCustomNote(event.target.value)}
-              placeholder="例如：我想保留设计实践主线，但用户测试部分要写得更重，结果章要突出情感识别度。"
-              rows={4}
-              value={customNote}
-            />
+          <div className="keyword-cluster">
+            {selected.readyOutputs.map((item) => (
+              <span key={item} className="ghost-chip">
+                {item}
+              </span>
+            ))}
           </div>
-          <div className="hint-panel top-gap">
-            <strong>系统反馈</strong>
-            <p>{statusMessage}</p>
+          <p className="lead-text top-gap">
+            进入论文框架页后，系统会优先围绕这些结果组织标题、摘要和章节顺序。
+          </p>
+        </section>
+
+        <section className="content-card stitch-panel">
+          <div className="card-heading card-heading--stack">
+            <span className="eyebrow">决策顺序</span>
+            <h3>这一页建议按这个顺序完成</h3>
+          </div>
+          <div className="stack-list">
+            <div className="line-item line-item--column">
+              <strong>1. 先选主路线</strong>
+              <p>从 5 个方向里选一个最能代表你研究贡献的主方案。</p>
+            </div>
+            <div className="line-item line-item--column">
+              <strong>2. 再补人工提醒</strong>
+              <p>如果你想调整重心，就只补最关键的一句人工说明，不要在这里重写整份方案。</p>
+            </div>
+            <div className="line-item line-item--column">
+              <strong>3. 最后确认并存档</strong>
+              <p>只有留档后，后面的框架、章节和全文才有稳定的出发点。</p>
+            </div>
           </div>
         </section>
       </div>
