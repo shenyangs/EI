@@ -11,9 +11,9 @@ export function VenueHeaderInfo() {
   return (
     <>
       <span className="eyebrow">{venue.shortName}</span>
-      <h2>先定方向，再逐步写完整篇论文。</h2>
+      <h2>按当前会议规则继续推进全文。</h2>
       <p className="project-hero__copy">
-        当前已绑定 {venue.name} 规则。后面的框架、自检、字数判断和导出检查，都会继续按这套会议画像推进。
+        当前已绑定 {venue.name} 规则。后面的框架、自检、字数判断和导出检查，都会沿这套投稿画像继续推进。
       </p>
     </>
   );

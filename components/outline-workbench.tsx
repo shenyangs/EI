@@ -130,8 +130,9 @@ export function OutlineWorkbench({
     matchesCurrent,
     upsertRecord
   } = useProjectArchive(projectId);
+  const needsBootstrapOutline = !initialPackages || !initialOutline;
   const shouldGenerateOutline = Boolean(
-    (!initialPackages || !initialOutline) && projectId && selectedDirection && projectTitle
+    needsBootstrapOutline && projectId && selectedDirection && projectTitle
   );
   const fallbackOutline = useMemo(() => buildOutlineFallback({
     projectTitle,
@@ -259,6 +260,16 @@ export function OutlineWorkbench({
     useStreaming,
     venueId
   ]);
+
+  useEffect(() => {
+    if (!loading || shouldGenerateOutline || !needsBootstrapOutline) {
+      return;
+    }
+
+    applyDefaultOutline(
+      "当前还没有拿到明确研究方向，系统已先为你生成默认大纲，你可以直接继续编辑，稍后再补充方向。"
+    );
+  }, [applyDefaultOutline, loading, needsBootstrapOutline, shouldGenerateOutline]);
 
   useEffect(() => {
     if (!loading || !shouldGenerateOutline) {

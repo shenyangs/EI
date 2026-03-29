@@ -27,7 +27,10 @@ export default async function ProjectOverviewPage({
       <section className="overview-cockpit">
         <div className="overview-cockpit__main">
           <span className="eyebrow">Project Decision Cockpit</span>
-          <h2>先判断项目到了哪一步，再决定下一步做什么。</h2>
+          <h2 className="stitch-title-stack stitch-title-stack--tight">
+            <span>先判断项目到了哪一步，</span>
+            <span>再决定下一步做什么。</span>
+          </h2>
           <p>
             这页不是信息汇总页，而是你的项目决策台。它负责回答三件事：当前阶段、下一步动作、还有哪些风险必须先消掉。
           </p>

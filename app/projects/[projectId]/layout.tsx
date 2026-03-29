@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Suspense } from "react";
 
 import { ProgressStrip } from "@/components/progress-strip";
 import { ProjectNav } from "@/components/project-nav";
@@ -49,7 +50,9 @@ export default async function ProjectLayout({
         </div>
         <div className="project-hero project-hero--scholarly">
           <div className="project-hero__copy">
-            <VenueHeaderInfo />
+            <Suspense fallback={null}>
+              <VenueHeaderInfo />
+            </Suspense>
           </div>
           <div className="project-summary__note">
             <span className="eyebrow">当前操作原则</span>
@@ -70,13 +73,17 @@ export default async function ProjectLayout({
             <h3>研究流程导航（6 步）</h3>
             <p>首页、项目页、写作页和文献页都围着同一条主线走，不让用户在不同页面学两套逻辑。</p>
           </div>
-          <ProjectNav projectId={project.id} />
+          <Suspense fallback={null}>
+            <ProjectNav projectId={project.id} />
+          </Suspense>
         </section>
         {children}
       </section>
 
       <div className="mobile-project-dock" aria-hidden="false">
-        <ProjectNav projectId={project.id} variant="dock" />
+        <Suspense fallback={null}>
+          <ProjectNav projectId={project.id} variant="dock" />
+        </Suspense>
       </div>
     </main>
   );

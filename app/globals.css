@@ -5355,3 +5355,2824 @@ textarea:focus {
     grid-template-columns: 1fr;
   }
 }
+
+/* Stitch Direct Rebuild */
+.ambient {
+  display: none;
+}
+
+body {
+  background: #f2f3f1;
+}
+
+.site-frame {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 18px;
+  min-height: 100vh;
+  padding: 14px;
+}
+
+.site-stage {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  min-width: 0;
+}
+
+.site-shell {
+  width: 100%;
+  padding: 0 0 32px;
+}
+
+.site-topbar {
+  position: sticky;
+  top: 10px;
+  z-index: 30;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+  padding: 10px 14px;
+  border: 1px solid rgba(23, 31, 38, 0.08);
+  border-radius: 18px;
+  background: rgba(250, 250, 248, 0.94);
+  box-shadow: 0 6px 18px rgba(18, 24, 31, 0.04);
+  backdrop-filter: blur(12px);
+}
+
+.site-topbar__search {
+  display: inline-flex;
+  align-items: center;
+  min-width: 260px;
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(23, 31, 38, 0.08);
+  background: #ffffff;
+  color: #8a9097;
+  font-size: 0.8rem;
+}
+
+.site-topbar__panel {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.stitch-shell-nav {
+  position: sticky;
+  top: 14px;
+  display: grid;
+  align-content: start;
+  gap: 16px;
+  height: fit-content;
+  padding: 14px 12px;
+  border-radius: 24px;
+  border: 1px solid rgba(23, 31, 38, 0.08);
+  background: linear-gradient(180deg, #f8f8f6, #f1f2f0);
+  box-shadow: 0 8px 20px rgba(18, 24, 31, 0.04);
+}
+
+.stitch-shell-nav__brand {
+  display: grid;
+  gap: 4px;
+  padding: 2px 4px 10px;
+  border-bottom: 1px solid rgba(23, 31, 38, 0.08);
+}
+
+.stitch-shell-nav__logo {
+  color: #1c2730;
+  font-family: "Noto Serif SC", "Source Han Serif SC", serif;
+  font-size: 1.08rem;
+  letter-spacing: -0.04em;
+}
+
+.stitch-shell-nav__brand p,
+.stitch-shell-nav__meta span,
+.stitch-shell-nav__item-subtitle {
+  margin: 0;
+  color: #8a9097;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.stitch-shell-nav__meta {
+  display: grid;
+  gap: 4px;
+  padding: 0 4px;
+}
+
+.stitch-shell-nav__meta strong {
+  color: #16212d;
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.stitch-shell-nav__list {
+  display: grid;
+  gap: 6px;
+}
+
+.stitch-shell-nav__item {
+  display: grid;
+  gap: 3px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  color: #23313d;
+  background: transparent;
+  border: 1px solid transparent;
+  transition: background 160ms ease, border-color 160ms ease, transform 160ms ease;
+}
+
+.stitch-shell-nav__item:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.72);
+  border-color: rgba(23, 31, 38, 0.08);
+}
+
+.stitch-shell-nav__item.active {
+  background: #ffffff;
+  border-color: rgba(17, 38, 58, 0.1);
+  box-shadow: 0 6px 16px rgba(17, 38, 58, 0.05);
+}
+
+.stitch-shell-nav__item-label {
+  font-size: 0.92rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.stitch-shell-nav__footer {
+  padding-top: 8px;
+  border-top: 1px solid rgba(23, 31, 38, 0.08);
+}
+
+.stitch-shell-nav__cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 42px;
+  border-radius: 14px;
+  background: #16344b;
+  color: #fff;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.project-nav-shell,
+.mobile-project-dock {
+  display: none !important;
+}
+
+.project-main {
+  grid-template-columns: 1fr !important;
+}
+
+.home-page--stitch,
+.overview-page--stitch,
+.writing-page {
+  gap: 18px;
+}
+
+.stitch-command-home,
+.overview-cockpit,
+.writing-command-deck--stitch {
+  grid-template-columns: minmax(0, 1.38fr) minmax(280px, 0.72fr);
+  gap: 16px;
+  padding: 18px;
+  border-radius: 24px;
+  border: 1px solid rgba(23, 31, 38, 0.08);
+  background: #f7f7f5;
+  box-shadow: none;
+}
+
+.stitch-command-home__main h1,
+.overview-cockpit__main h2,
+.writing-command-deck--stitch h2 {
+  max-width: 11ch;
+  color: #18232d;
+  font-size: clamp(2.3rem, 4vw, 4rem);
+  line-height: 0.98;
+  letter-spacing: -0.06em;
+}
+
+.stitch-command-home__main p,
+.overview-cockpit__main p,
+.writing-command-deck--stitch p {
+  max-width: 58ch;
+  color: #66707a;
+  font-size: 0.95rem;
+}
+
+.stitch-command-home__signals article,
+.overview-cockpit__metric,
+.stitch-brief-card,
+.overview-priority-card,
+.writing-side-card,
+.content-card,
+.archive-panel {
+  border: 1px solid rgba(23, 31, 38, 0.08);
+  box-shadow: none;
+}
+
+.stitch-command-home__signals article,
+.overview-cockpit__metric {
+  background: #ffffff;
+}
+
+.content-card,
+.archive-panel,
+.project-summary,
+.project-card,
+.progress-card {
+  background: #f7f7f5;
+}
+
+.hero-plaque,
+.ghost-chip,
+.status-badge,
+.secondary-button,
+.status-light,
+.auth-nav__link {
+  background: #ffffff;
+  border-color: rgba(23, 31, 38, 0.08);
+  box-shadow: none;
+}
+
+.primary-button,
+.auth-nav__link--primary {
+  background: #16344b;
+  border-color: #16344b;
+  box-shadow: none;
+}
+
+.project-summary--scholarly {
+  background: #f7f7f5;
+  border: 1px solid rgba(23, 31, 38, 0.08);
+  box-shadow: none;
+}
+
+.project-summary__signals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.stitch-home-grid,
+.overview-decision-grid {
+  grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
+}
+
+.stitch-flow-board {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.stitch-flow-step {
+  background: #ffffff;
+  border: 1px solid rgba(23, 31, 38, 0.08);
+  box-shadow: none;
+}
+
+.project-grid {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.project-card {
+  background: #ffffff;
+}
+
+.auth-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.auth-nav__link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 999px;
+  color: #22303c;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+@media (max-width: 1080px) {
+  .site-frame {
+    grid-template-columns: 1fr;
+  }
+
+  .stitch-shell-nav {
+    position: static;
+    gap: 12px;
+  }
+
+  .stitch-shell-nav__list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .site-topbar {
+    top: 0;
+  }
+
+  .stitch-home-grid,
+  .overview-decision-grid,
+  .project-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .site-frame {
+    padding: 10px;
+    gap: 10px;
+  }
+
+  .site-topbar {
+    padding: 10px 12px;
+    border-radius: 16px;
+  }
+
+  .site-topbar__search {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .site-topbar,
+  .site-topbar__panel {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .stitch-shell-nav {
+    padding: 12px 10px;
+    border-radius: 18px;
+  }
+
+  .stitch-shell-nav__list {
+    grid-template-columns: 1fr;
+  }
+
+  .stitch-command-home,
+  .overview-cockpit,
+  .writing-command-deck--stitch {
+    grid-template-columns: 1fr;
+    padding: 14px;
+  }
+
+  .stitch-command-home__main h1,
+  .overview-cockpit__main h2,
+  .writing-command-deck--stitch h2 {
+    max-width: none;
+    font-size: clamp(2rem, 10vw, 2.6rem);
+  }
+
+  .content-card,
+  .archive-panel,
+  .project-summary,
+  .project-card,
+  .progress-card {
+    border-radius: 18px;
+  }
+}
+
+/* Stitch Compact Deep Pages */
+.project-shell {
+  gap: 12px;
+}
+
+.project-summary--scholarly {
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 20px;
+}
+
+.project-summary__top {
+  grid-template-columns: auto auto;
+  align-items: center;
+}
+
+.project-summary__body {
+  grid-template-columns: minmax(0, 1.5fr) minmax(240px, 0.8fr);
+  align-items: start;
+  gap: 10px 16px;
+}
+
+.project-summary__copy h1 {
+  font-size: clamp(1.3rem, 2.3vw, 1.9rem);
+  line-height: 1.02;
+  letter-spacing: -0.05em;
+}
+
+.project-summary__copy p {
+  font-size: 0.88rem;
+}
+
+.project-hero--scholarly {
+  display: none;
+}
+
+.progress-card {
+  padding: 12px;
+  border-radius: 18px;
+}
+
+.progress-strip__head span {
+  font-size: 0.76rem;
+}
+
+.writing-command-deck--stitch,
+.decision-stage-hero {
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: 20px;
+}
+
+.writing-command-deck--stitch h2,
+.decision-stage-hero__main h2 {
+  max-width: 13ch;
+  font-size: clamp(1.55rem, 2.6vw, 2.4rem);
+  line-height: 1.02;
+  letter-spacing: -0.055em;
+}
+
+.writing-command-deck--stitch p,
+.decision-stage-hero__main p {
+  font-size: 0.9rem;
+  max-width: 56ch;
+}
+
+.editorial-note-card,
+.stitch-brief-card {
+  padding: 0.95rem 1rem;
+  border-radius: 16px;
+}
+
+.writing-studio-layout {
+  grid-template-columns: 220px minmax(0, 1fr) 290px;
+  gap: 0.95rem;
+}
+
+.writing-studio-sidebar,
+.writing-studio-main,
+.writing-studio-rail {
+  gap: 0.85rem;
+}
+
+.writing-side-card,
+.chapter-button,
+.editor-surface,
+.empty-chapter,
+.message,
+.ai-analysis,
+.analysis-scorecard {
+  border-radius: 16px;
+}
+
+.chapter-button,
+.writing-side-card,
+.analysis-scorecard,
+.ai-analysis,
+.empty-chapter,
+.message {
+  background: #ffffff;
+  border: 1px solid rgba(23, 31, 38, 0.08);
+}
+
+.chapter-button {
+  padding: 0.8rem 0.9rem;
+}
+
+.writing-toolbar {
+  justify-content: space-between;
+}
+
+.editor-surface {
+  margin-top: 0;
+  min-height: 320px;
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(23, 31, 38, 0.08);
+  background: #ffffff;
+}
+
+.reference-manager-panel,
+.fulltext-review-rail,
+.decision-dossier {
+  gap: 0.8rem;
+}
+
+.reference-manager-panel .content-card,
+.fulltext-review-grid .content-card,
+.outline-workbench-grid .content-card,
+.direction-workbench-grid .content-card {
+  border-radius: 18px;
+}
+
+.compact-stage-hero {
+  gap: 10px;
+  padding: 12px 14px;
+}
+
+.compact-stage-hero .decision-stage-hero__main,
+.compact-stage-hero .writing-command-deck__main {
+  gap: 0.55rem;
+}
+
+.compact-stage-hero .decision-stage-hero__main h2,
+.compact-stage-hero .writing-command-deck__main h2 {
+  max-width: 16ch;
+  font-size: clamp(1.32rem, 2.1vw, 2rem);
+}
+
+.compact-stage-hero .decision-stage-hero__main p,
+.compact-stage-hero .writing-command-deck__main p {
+  font-size: 0.86rem;
+}
+
+@media (max-width: 1080px) {
+  .project-summary__body,
+  .writing-command-deck--stitch,
+  .decision-stage-hero,
+  .writing-studio-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .writing-command-deck__rail,
+  .decision-stage-hero__rail {
+    order: -1;
+  }
+}
+
+@media (max-width: 720px) {
+  .project-summary--scholarly,
+  .writing-command-deck--stitch,
+  .decision-stage-hero {
+    padding: 12px;
+    border-radius: 16px;
+  }
+
+  .project-summary__top,
+  .project-summary__body {
+    grid-template-columns: 1fr;
+  }
+
+  .project-summary__signals {
+    gap: 6px;
+  }
+
+  .project-summary__signals .ghost-chip {
+    width: fit-content;
+  }
+
+  .writing-command-deck--stitch h2,
+  .decision-stage-hero__main h2 {
+    max-width: none;
+    font-size: clamp(1.55rem, 8vw, 2.1rem);
+  }
+
+  .writing-studio-layout {
+    gap: 0.8rem;
+  }
+
+  .chapter-button,
+  .writing-side-card,
+  .editor-surface,
+  .reference-item,
+  .line-item {
+    padding: 0.82rem;
+  }
+}
+
+/* Stitch Hard Reset */
+:root {
+  --stitch-ink: #16212b;
+  --stitch-muted: #6e7781;
+  --stitch-line: rgba(22, 33, 43, 0.1);
+  --stitch-surface: #f7f6f2;
+  --stitch-card: #fbfaf7;
+  --stitch-accent: #18394f;
+}
+
+body {
+  background: #f1f0eb;
+  color: var(--stitch-ink);
+}
+
+.site-topbar,
+.stitch-shell-nav,
+.stitch-command-home,
+.overview-cockpit,
+.writing-command-deck--stitch,
+.decision-stage-hero,
+.project-summary--scholarly,
+.content-card,
+.archive-panel,
+.project-card,
+.progress-card,
+.stitch-flow-step,
+.stitch-brief-card,
+.overview-priority-card,
+.writing-side-card,
+.chapter-button,
+.editor-surface,
+.reference-item,
+.version-record,
+.line-item,
+.choice-card,
+.stitch-tab-button,
+.project-nav__item,
+.project-nav__dock-item,
+.status-light,
+.ghost-chip,
+.hero-plaque,
+.status-badge,
+.primary-button,
+.secondary-button,
+.auth-nav__link,
+.stitch-shell-nav__item {
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  background-image: none !important;
+}
+
+.site-topbar,
+.stitch-shell-nav,
+.stitch-command-home,
+.overview-cockpit,
+.writing-command-deck--stitch,
+.decision-stage-hero,
+.project-summary--scholarly,
+.content-card,
+.archive-panel,
+.project-card,
+.progress-card,
+.stitch-flow-step,
+.stitch-brief-card,
+.overview-priority-card,
+.writing-side-card,
+.chapter-button,
+.editor-surface,
+.reference-item,
+.version-record,
+.line-item,
+.choice-card,
+.project-nav__item,
+.project-nav__dock-item,
+.stitch-shell-nav__item {
+  border: 1px solid var(--stitch-line) !important;
+  border-radius: 8px !important;
+  background: var(--stitch-card) !important;
+}
+
+.hero-plaque,
+.ghost-chip,
+.status-badge,
+.status-light,
+.stitch-tab-button,
+.auth-nav__link,
+.secondary-button,
+.primary-button {
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 6px !important;
+  border: 1px solid var(--stitch-line) !important;
+  font-weight: 700;
+}
+
+.primary-button,
+.auth-nav__link--primary,
+.stitch-shell-nav__cta {
+  background: var(--stitch-accent) !important;
+  color: #fff !important;
+  border-color: var(--stitch-accent) !important;
+}
+
+.secondary-button,
+.ghost-chip,
+.hero-plaque,
+.status-badge,
+.status-light,
+.stitch-tab-button,
+.auth-nav__link {
+  background: #fdfcf9 !important;
+  color: var(--stitch-ink) !important;
+}
+
+.stitch-tab-button.active,
+.choice-card--active,
+.chapter-button.active,
+.project-nav__item.active,
+.stitch-shell-nav__item.active {
+  background: #eef2f1 !important;
+  border-color: rgba(24, 57, 79, 0.28) !important;
+}
+
+.site-topbar {
+  border-radius: 8px !important;
+  background: #f8f7f3 !important;
+}
+
+.site-topbar__search {
+  border-radius: 6px !important;
+  border: 1px solid var(--stitch-line);
+  background: #fffdf9;
+}
+
+.stitch-shell-nav {
+  background: #ecebe5 !important;
+}
+
+.stitch-shell-nav__brand,
+.stitch-shell-nav__footer {
+  border-color: var(--stitch-line);
+}
+
+.stitch-shell-nav__logo,
+.brand,
+.home-page--stitch h1,
+.home-page--stitch h2,
+.home-page--stitch h3,
+.overview-page--stitch h2,
+.overview-page--stitch h3,
+.writing-page h2,
+.writing-page h3,
+.decision-stage-hero__main h2,
+.writing-command-deck__main h2,
+.project-summary__copy h1,
+.manager-header h2,
+.detail-content h2 {
+  font-family: "Noto Serif SC", "Source Han Serif SC", "Songti SC", serif !important;
+  color: var(--stitch-ink) !important;
+}
+
+.stitch-command-home__main h1,
+.overview-cockpit__main h2,
+.writing-command-deck--stitch h2,
+.decision-stage-hero__main h2 {
+  letter-spacing: -0.07em !important;
+  line-height: 0.95 !important;
+}
+
+.stitch-command-home__main p,
+.overview-cockpit__main p,
+.writing-command-deck--stitch p,
+.decision-stage-hero__main p,
+.content-card p,
+.content-card li,
+.project-summary p,
+.line-item span,
+.reference-count,
+.reference-meta,
+.detail-meta,
+.reference-authors,
+.reference-notes,
+.reference-abstract {
+  color: var(--stitch-muted) !important;
+}
+
+.stitch-command-home,
+.overview-cockpit,
+.writing-command-deck--stitch,
+.decision-stage-hero,
+.project-summary--scholarly {
+  padding: 12px 14px !important;
+}
+
+.stitch-command-home__signals,
+.overview-cockpit__metrics,
+.decision-metrics {
+  gap: 8px !important;
+}
+
+.stitch-command-home__signals article,
+.overview-cockpit__metric,
+.decision-metric {
+  padding: 0.8rem !important;
+  border-radius: 8px !important;
+  background: #fffefb !important;
+  border: 1px solid var(--stitch-line) !important;
+}
+
+.stitch-flow-step span,
+.project-nav__index,
+.stitch-shell-nav__item-subtitle,
+.stitch-shell-nav__brand p,
+.stitch-shell-nav__meta span,
+.eyebrow {
+  color: #7d858e !important;
+}
+
+.editor-surface,
+.fulltext-surface {
+  background: #fffefb !important;
+}
+
+.project-summary__signals,
+.stitch-command-home__actions,
+.button-row {
+  gap: 8px !important;
+}
+
+.content-card::before,
+.site-header,
+.ambient,
+.mobile-project-dock {
+  display: none !important;
+}
+
+@media (max-width: 720px) {
+  .site-topbar,
+  .stitch-shell-nav,
+  .stitch-command-home,
+  .overview-cockpit,
+  .writing-command-deck--stitch,
+  .decision-stage-hero,
+  .project-summary--scholarly,
+  .content-card,
+  .archive-panel,
+  .project-card,
+  .progress-card {
+    border-radius: 6px !important;
+  }
+
+  .primary-button,
+  .secondary-button,
+  .stitch-tab-button,
+  .auth-nav__link {
+    border-radius: 4px !important;
+  }
+}
+
+/* Stitch Total Reset */
+:root {
+  --stitch-paper: #f3f2ed;
+  --stitch-paper-strong: #eeece5;
+  --stitch-panel-flat: #fbfaf6;
+  --stitch-panel-quiet: #f6f4ee;
+  --stitch-line-strong: rgba(16, 24, 32, 0.14);
+  --stitch-line-soft: rgba(16, 24, 32, 0.08);
+  --stitch-navy: #0f3557;
+  --stitch-text: #16202a;
+  --stitch-copy: #5d6771;
+}
+
+body {
+  background: var(--stitch-paper) !important;
+  color: var(--stitch-text) !important;
+}
+
+.site-frame {
+  background: var(--stitch-paper) !important;
+  gap: 18px !important;
+  padding: 18px !important;
+}
+
+.site-stage {
+  gap: 14px !important;
+}
+
+.site-shell {
+  gap: 16px !important;
+  padding: 0 !important;
+}
+
+.site-topbar,
+.stitch-shell-nav,
+.stitch-command-home,
+.overview-cockpit,
+.writing-command-deck--stitch,
+.decision-stage-hero,
+.project-summary--scholarly,
+.content-card,
+.archive-panel,
+.project-card,
+.progress-card,
+.stitch-flow-step,
+.stitch-brief-card,
+.overview-priority-card,
+.writing-side-card,
+.chapter-button,
+.editor-surface,
+.fulltext-surface,
+.reference-item,
+.version-record,
+.line-item,
+.choice-card,
+.project-nav__item,
+.project-nav__dock-item,
+.stitch-shell-nav__item,
+.metric-card,
+.hint-panel,
+.message-banner,
+.outline-item,
+.export-format-card,
+.search-input,
+.search-box input,
+.site-topbar__search,
+.project-nav,
+.project-nav-shell {
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  background-image: none !important;
+}
+
+.site-topbar,
+.stitch-shell-nav,
+.stitch-command-home,
+.overview-cockpit,
+.writing-command-deck--stitch,
+.decision-stage-hero,
+.project-summary--scholarly,
+.content-card,
+.archive-panel,
+.project-card,
+.progress-card,
+.stitch-flow-step,
+.stitch-brief-card,
+.overview-priority-card,
+.writing-side-card,
+.chapter-button,
+.editor-surface,
+.fulltext-surface,
+.reference-item,
+.version-record,
+.line-item,
+.choice-card,
+.project-nav__item,
+.project-nav__dock-item,
+.stitch-shell-nav__item,
+.metric-card,
+.hint-panel,
+.message-banner,
+.outline-item,
+.export-format-card,
+.search-input,
+.search-box input,
+.site-topbar__search,
+.project-nav {
+  border-radius: 4px !important;
+  border: 1px solid var(--stitch-line-soft) !important;
+  background: var(--stitch-panel-flat) !important;
+}
+
+.primary-button,
+.secondary-button,
+.stitch-shell-nav__cta,
+.auth-nav__link,
+.stitch-tab-button,
+.status-badge,
+.ghost-chip,
+.hero-plaque,
+.status-light,
+.paper-type-trigger,
+.paper-type-option {
+  border-radius: 3px !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  background-image: none !important;
+}
+
+.primary-button,
+.auth-nav__link--primary,
+.stitch-shell-nav__cta {
+  background: var(--stitch-navy) !important;
+  border: 1px solid var(--stitch-navy) !important;
+  color: #f8f8f4 !important;
+}
+
+.secondary-button,
+.auth-nav__link,
+.stitch-tab-button,
+.ghost-chip,
+.hero-plaque,
+.status-badge,
+.status-light,
+.paper-type-trigger,
+.paper-type-option {
+  background: #f9f8f3 !important;
+  border: 1px solid var(--stitch-line-strong) !important;
+  color: var(--stitch-text) !important;
+}
+
+.site-topbar {
+  min-height: 56px !important;
+  padding: 10px 14px !important;
+  background: #f7f5ef !important;
+  border-color: var(--stitch-line-strong) !important;
+}
+
+.site-topbar__search {
+  min-height: 38px !important;
+  padding: 0 12px !important;
+  color: #7c858d !important;
+  background: #fcfbf7 !important;
+}
+
+.site-topbar__panel {
+  gap: 8px !important;
+}
+
+.stitch-shell-nav {
+  width: 228px !important;
+  padding: 16px 14px !important;
+  gap: 14px !important;
+  background: var(--stitch-paper-strong) !important;
+  border-color: var(--stitch-line-strong) !important;
+}
+
+.stitch-shell-nav__brand,
+.stitch-shell-nav__meta,
+.stitch-shell-nav__footer {
+  padding-left: 2px !important;
+  padding-right: 2px !important;
+  border-color: var(--stitch-line-soft) !important;
+}
+
+.stitch-shell-nav__brand {
+  padding-bottom: 12px !important;
+}
+
+.stitch-shell-nav__meta {
+  padding-top: 4px !important;
+  padding-bottom: 10px !important;
+}
+
+.stitch-shell-nav__logo {
+  font-size: 1.2rem !important;
+  letter-spacing: -0.06em !important;
+}
+
+.stitch-shell-nav__list {
+  gap: 6px !important;
+}
+
+.stitch-shell-nav__item {
+  min-height: 54px !important;
+  padding: 11px 12px !important;
+  background: #f9f8f3 !important;
+}
+
+.stitch-shell-nav__item:hover,
+.stitch-shell-nav__item.active {
+  background: #f4f2eb !important;
+  border-color: rgba(15, 53, 87, 0.22) !important;
+}
+
+.stitch-shell-nav__item-label,
+.stitch-shell-nav__meta strong,
+.card-heading h2,
+.card-heading h3,
+.grid-header h2,
+.project-summary__copy h1,
+.decision-stage-hero__main h2,
+.writing-command-deck__main h2,
+.stitch-command-home__main h1,
+.overview-cockpit__main h2 {
+  color: var(--stitch-text) !important;
+}
+
+.stitch-shell-nav__brand p,
+.stitch-shell-nav__meta span,
+.stitch-shell-nav__item-subtitle,
+.eyebrow,
+.card-heading p,
+.grid-header p,
+.project-summary__copy p,
+.decision-stage-hero__main p,
+.writing-command-deck__main p,
+.stitch-command-home__main p,
+.overview-cockpit__main p,
+.line-item span,
+.hint-panel p,
+.message-banner,
+.reference-meta,
+.reference-authors,
+.reference-notes,
+.reference-abstract,
+.paper-type__description,
+.paper-type__hint {
+  color: var(--stitch-copy) !important;
+}
+
+.stitch-command-home,
+.overview-cockpit,
+.writing-command-deck--stitch,
+.decision-stage-hero,
+.project-summary--scholarly {
+  padding: 14px 16px !important;
+  background: #f9f8f4 !important;
+  border-color: var(--stitch-line-strong) !important;
+}
+
+.stitch-command-home__main h1,
+.overview-cockpit__main h2,
+.writing-command-deck--stitch h2,
+.decision-stage-hero__main h2,
+.project-summary__copy h1 {
+  font-size: clamp(2.3rem, 4.1vw, 4rem) !important;
+  line-height: 0.96 !important;
+  letter-spacing: -0.085em !important;
+  max-width: 10ch !important;
+}
+
+.stitch-command-home__main p,
+.overview-cockpit__main p,
+.writing-command-deck--stitch p,
+.decision-stage-hero__main p {
+  max-width: 62ch !important;
+}
+
+.stitch-command-home__signals,
+.overview-cockpit__metrics,
+.decision-metrics,
+.metric-grid {
+  gap: 8px !important;
+}
+
+.stitch-command-home__signals article,
+.overview-cockpit__metric,
+.decision-metric,
+.metric-card {
+  padding: 12px !important;
+  border-radius: 4px !important;
+  background: var(--stitch-panel-flat) !important;
+  border: 1px solid var(--stitch-line-soft) !important;
+}
+
+.stitch-home-grid,
+.overview-cockpit-grid,
+.fulltext-review-grid {
+  gap: 14px !important;
+}
+
+.card-heading--stack {
+  gap: 4px !important;
+}
+
+.content-card,
+.archive-panel,
+.project-card,
+.progress-card,
+.stitch-brief-card,
+.overview-priority-card,
+.writing-side-card {
+  padding: 14px !important;
+}
+
+.stitch-flow-board {
+  gap: 8px !important;
+}
+
+.stitch-flow-step {
+  padding: 12px !important;
+  min-height: 0 !important;
+}
+
+.stitch-flow-step strong,
+.line-item strong,
+.outline-item__body strong,
+.reference-title,
+.project-card h3,
+.choice-card strong,
+.chapter-button strong {
+  color: var(--stitch-text) !important;
+}
+
+.choice-card,
+.line-item,
+.outline-item,
+.reference-item,
+.chapter-button,
+.export-format-card,
+.paper-type-trigger,
+.paper-type-option {
+  text-align: left !important;
+  padding: 12px !important;
+  transition: border-color 140ms ease, background-color 140ms ease !important;
+}
+
+.line-item--link:hover,
+.outline-item--link:hover,
+.choice-card:hover,
+.paper-type-trigger:hover,
+.paper-type-option:hover,
+.chapter-button:hover,
+.reference-item:hover,
+.export-format-card:hover {
+  transform: none !important;
+  background: #f4f2eb !important;
+  border-color: rgba(15, 53, 87, 0.18) !important;
+}
+
+.choice-card--active,
+.chapter-button.active,
+.project-nav__item.active,
+.project-nav__dock-item.active,
+.stitch-tab-button.active,
+.stitch-shell-nav__item.active,
+.paper-type-option.choice-card--active,
+.export-format-card.choice-card--active {
+  background: #eef1ee !important;
+  border-color: rgba(15, 53, 87, 0.24) !important;
+}
+
+.paper-type-trigger,
+.paper-type-option {
+  width: 100%;
+}
+
+.paper-type-dropdown {
+  padding: 10px !important;
+  margin-top: 8px !important;
+  position: relative;
+  z-index: 20;
+  border-radius: 4px !important;
+  border: 1px solid var(--stitch-line-strong) !important;
+  background: #f9f8f3 !important;
+}
+
+.paper-type-dropdown .paper-type-option + .paper-type-option {
+  margin-top: 8px !important;
+}
+
+.project-grid,
+.writing-studio-layout,
+.reference-toolbar,
+.search-form,
+.toolbar-actions,
+.button-row,
+.stack-list,
+.fulltext-review-rail {
+  gap: 10px !important;
+}
+
+.writing-studio-layout {
+  align-items: start !important;
+}
+
+.editor-surface,
+.fulltext-surface {
+  padding: 16px !important;
+  background: #fcfbf7 !important;
+  border-color: var(--stitch-line-strong) !important;
+}
+
+.reference-toolbar,
+.search-form {
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+}
+
+.search-input,
+.search-box input {
+  min-height: 42px !important;
+  padding: 0 12px !important;
+  background: #fcfbf7 !important;
+}
+
+.message-banner,
+.hint-panel {
+  padding: 12px !important;
+  background: #f7f5ef !important;
+  border-color: var(--stitch-line-strong) !important;
+}
+
+.connection-lights,
+.auth-nav {
+  gap: 8px !important;
+}
+
+.status-lights {
+  padding: 0 !important;
+  gap: 8px !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+.status-badge,
+.ghost-chip,
+.hero-plaque,
+.status-light {
+  min-height: 28px !important;
+  padding: 0 10px !important;
+  font-weight: 700 !important;
+}
+
+.hero-plaque {
+  background: #f0ede5 !important;
+}
+
+.status-light,
+.auth-nav__link,
+.secondary-button,
+.primary-button,
+.sidebar-home,
+.review-action-button {
+  border-radius: 3px !important;
+}
+
+.sidebar-home {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: 36px !important;
+  padding: 0 14px !important;
+  border: 1px solid var(--stitch-line-soft) !important;
+  background: #f8f6f0 !important;
+  color: var(--stitch-text) !important;
+  box-shadow: none !important;
+}
+
+.project-summary__signals {
+  gap: 8px !important;
+}
+
+.project-summary__signals .ghost-chip {
+  background: #f8f6f0 !important;
+}
+
+.mobile-project-dock,
+.site-header,
+.ambient,
+.content-card::before {
+  display: none !important;
+}
+
+@media (max-width: 1040px) {
+  .site-frame {
+    padding: 12px !important;
+    gap: 12px !important;
+  }
+
+  .stitch-shell-nav {
+    width: 100% !important;
+    padding: 12px !important;
+  }
+
+  .stitch-shell-nav__list {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 720px) {
+  .site-frame {
+    padding: 10px !important;
+    gap: 10px !important;
+  }
+
+  .site-topbar {
+    min-height: 0 !important;
+    padding: 10px !important;
+  }
+
+  .site-topbar__search {
+    min-height: 36px !important;
+    width: 100% !important;
+  }
+
+  .stitch-shell-nav {
+    padding: 10px !important;
+    gap: 10px !important;
+  }
+
+  .stitch-shell-nav__list {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 6px !important;
+  }
+
+  .stitch-shell-nav__item {
+    min-height: 48px !important;
+    padding: 10px !important;
+  }
+
+  .stitch-command-home,
+  .overview-cockpit,
+  .writing-command-deck--stitch,
+  .decision-stage-hero,
+  .project-summary--scholarly,
+  .content-card,
+  .archive-panel,
+  .project-card,
+  .progress-card,
+  .stitch-flow-step,
+  .stitch-brief-card,
+  .overview-priority-card,
+  .writing-side-card,
+  .chapter-button,
+  .editor-surface,
+  .fulltext-surface,
+  .reference-item,
+  .line-item,
+  .choice-card,
+  .metric-card,
+  .hint-panel,
+  .message-banner,
+  .outline-item,
+  .export-format-card,
+  .search-input,
+  .search-box input,
+  .site-topbar__search {
+    border-radius: 3px !important;
+  }
+
+  .stitch-command-home__main h1,
+  .overview-cockpit__main h2,
+  .writing-command-deck--stitch h2,
+  .decision-stage-hero__main h2,
+  .project-summary__copy h1 {
+    font-size: clamp(2rem, 11vw, 2.7rem) !important;
+    max-width: 100% !important;
+  }
+
+  .stitch-command-home__actions,
+  .button-row,
+  .toolbar-actions {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Stitch Proportion Polish */
+.stitch-command-home {
+  grid-template-columns: minmax(0, 1.16fr) 320px !important;
+  gap: 16px !important;
+  min-height: 0 !important;
+}
+
+.stitch-command-home__main {
+  align-content: start !important;
+  gap: 14px !important;
+}
+
+.stitch-command-home__main h1 {
+  font-size: clamp(3rem, 4.8vw, 4.5rem) !important;
+  max-width: 10.5ch !important;
+  line-height: 0.94 !important;
+  letter-spacing: -0.085em !important;
+}
+
+.stitch-title-stack {
+  display: grid !important;
+  gap: 0.02em !important;
+}
+
+.stitch-title-stack span {
+  display: block !important;
+}
+
+.stitch-title-stack--tight {
+  gap: 0.08em !important;
+}
+
+.stitch-command-home__rail {
+  align-content: stretch !important;
+  grid-template-rows: 1fr auto !important;
+}
+
+.stitch-command-home__signals {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+}
+
+.stitch-home-grid {
+  grid-template-columns: minmax(0, 1.36fr) minmax(260px, 0.92fr) minmax(260px, 0.88fr) !important;
+  align-items: start !important;
+}
+
+.overview-cockpit {
+  grid-template-columns: minmax(0, 1.22fr) 320px !important;
+  gap: 16px !important;
+}
+
+.overview-cockpit__main {
+  gap: 14px !important;
+}
+
+.overview-cockpit__main h2 {
+  font-size: clamp(3rem, 4.7vw, 4.3rem) !important;
+  max-width: 9.5ch !important;
+  line-height: 0.92 !important;
+  letter-spacing: -0.1em !important;
+}
+
+.overview-decision-grid {
+  grid-template-columns: minmax(0, 1.18fr) 320px !important;
+  gap: 14px !important;
+}
+
+.overview-flow-list {
+  display: grid !important;
+  gap: 8px !important;
+}
+
+.overview-flow-item--stitch {
+  display: grid !important;
+  grid-template-columns: 56px minmax(0, 1fr) !important;
+  gap: 12px !important;
+  align-items: start !important;
+}
+
+.overview-flow-item__index {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: 48px !important;
+  border: 1px solid var(--stitch-line-soft) !important;
+  background: #f4f2eb !important;
+  color: var(--stitch-navy) !important;
+  font-weight: 700 !important;
+}
+
+.project-summary__copy h1 {
+  font-size: clamp(2.9rem, 4.6vw, 4.8rem) !important;
+  line-height: 0.92 !important;
+  letter-spacing: -0.11em !important;
+  max-width: 8ch !important;
+}
+
+.project-summary__body {
+  grid-template-columns: minmax(0, 1.18fr) 320px !important;
+  gap: 14px !important;
+}
+
+.project-summary__signals {
+  align-content: start !important;
+}
+
+.progress-card {
+  padding: 10px 12px !important;
+}
+
+.project-shell:has(.writing-page) .project-nav-shell,
+.project-shell:has(.references-page) .project-nav-shell,
+.project-shell:has(.export-page) .project-nav-shell {
+  display: none !important;
+}
+
+.project-shell:has(.writing-page) .project-summary--scholarly,
+.project-shell:has(.references-page) .project-summary--scholarly,
+.project-shell:has(.export-page) .project-summary--scholarly {
+  gap: 10px !important;
+  padding: 12px 14px !important;
+}
+
+.project-shell:has(.writing-page) .project-summary__copy h1,
+.project-shell:has(.references-page) .project-summary__copy h1,
+.project-shell:has(.export-page) .project-summary__copy h1 {
+  font-size: clamp(2.2rem, 3.2vw, 3.2rem) !important;
+  max-width: 10ch !important;
+}
+
+.project-shell:has(.writing-page) .project-summary__copy p,
+.project-shell:has(.references-page) .project-summary__copy p,
+.project-shell:has(.export-page) .project-summary__copy p {
+  font-size: 0.82rem !important;
+  max-width: 48ch !important;
+}
+
+.project-shell:has(.writing-page) .project-summary__body,
+.project-shell:has(.references-page) .project-summary__body,
+.project-shell:has(.export-page) .project-summary__body {
+  grid-template-columns: minmax(0, 1fr) 300px !important;
+}
+
+.project-shell:has(.writing-page) .progress-card,
+.project-shell:has(.references-page) .progress-card,
+.project-shell:has(.export-page) .progress-card {
+  padding: 8px 10px !important;
+}
+
+.project-shell:has(.writing-page) .project-main,
+.project-shell:has(.references-page) .project-main,
+.project-shell:has(.export-page) .project-main {
+  gap: 0 !important;
+}
+
+.writing-command-deck--stitch {
+  grid-template-columns: minmax(0, 1fr) 280px !important;
+  gap: 14px !important;
+}
+
+.writing-command-deck--stitch h2 {
+  font-size: clamp(2.2rem, 3.6vw, 3.2rem) !important;
+  max-width: 9ch !important;
+  line-height: 0.92 !important;
+  letter-spacing: -0.1em !important;
+}
+
+.writing-studio-layout {
+  grid-template-columns: 220px minmax(0, 1fr) 300px !important;
+  gap: 12px !important;
+}
+
+.writing-studio-sidebar,
+.writing-studio-main,
+.writing-studio-rail {
+  position: relative;
+  top: 0;
+}
+
+.writing-studio-main {
+  min-width: 0 !important;
+}
+
+.chapter-selector {
+  display: grid !important;
+  gap: 8px !important;
+}
+
+.chapter-button {
+  min-height: 64px !important;
+  display: grid !important;
+  gap: 4px !important;
+  align-content: center !important;
+}
+
+.chapter-title {
+  font-size: 1rem !important;
+}
+
+.chapter-status {
+  font-size: 0.72rem !important;
+  letter-spacing: 0.12em !important;
+  text-transform: uppercase !important;
+  color: var(--stitch-copy) !important;
+}
+
+.chapter-editor {
+  gap: 12px !important;
+}
+
+.paragraph {
+  border: 1px solid var(--stitch-line-soft) !important;
+  background: #fcfbf7 !important;
+}
+
+.paragraph textarea,
+.custom-instruction textarea {
+  background: #fcfbf7 !important;
+  border: 0 !important;
+  min-height: 170px !important;
+  font-size: 0.96rem !important;
+  line-height: 1.72 !important;
+}
+
+.paragraph-actions,
+.editor-actions,
+.writing-toolbar {
+  gap: 8px !important;
+}
+
+.quality-criteria,
+.stack-list {
+  gap: 8px !important;
+}
+
+.ai-analysis {
+  gap: 10px !important;
+}
+
+.decision-stage-hero {
+  grid-template-columns: minmax(0, 1fr) 280px !important;
+  gap: 14px !important;
+}
+
+.decision-stage-hero__main h2 {
+  font-size: clamp(2.2rem, 3.6vw, 3.1rem) !important;
+  max-width: 9ch !important;
+  line-height: 0.92 !important;
+  letter-spacing: -0.1em !important;
+}
+
+@media (max-width: 1040px) {
+  .stitch-command-home,
+  .overview-cockpit,
+  .writing-command-deck--stitch,
+  .decision-stage-hero,
+  .project-summary__body,
+  .overview-decision-grid,
+  .stitch-home-grid,
+  .writing-studio-layout {
+    grid-template-columns: 1fr !important;
+  }
+
+  .stitch-home-grid {
+    gap: 12px !important;
+  }
+
+  .stitch-command-home__rail,
+  .overview-cockpit__rail,
+  .decision-stage-hero__rail {
+    grid-template-rows: auto !important;
+  }
+}
+
+@media (max-width: 720px) {
+  .stitch-command-home__main h1,
+  .overview-cockpit__main h2,
+  .project-summary__copy h1,
+  .writing-command-deck--stitch h2,
+  .decision-stage-hero__main h2 {
+    font-size: clamp(2.15rem, 11.5vw, 3rem) !important;
+    line-height: 0.92 !important;
+    letter-spacing: -0.095em !important;
+    max-width: 100% !important;
+  }
+
+  .stitch-command-home__signals,
+  .overview-cockpit__metrics {
+    grid-template-columns: 1fr !important;
+  }
+
+  .overview-flow-item--stitch {
+    grid-template-columns: 44px minmax(0, 1fr) !important;
+  }
+
+  .writing-studio-layout {
+    gap: 10px !important;
+  }
+
+  .paragraph textarea,
+  .custom-instruction textarea {
+    min-height: 140px !important;
+  }
+}
+
+/* Stitch Writing Desk Polish */
+.writing-studio-sidebar,
+.writing-studio-main,
+.writing-studio-rail {
+  gap: 10px !important;
+}
+
+.writing-studio-sidebar .card-heading,
+.writing-studio-main .card-heading,
+.writing-studio-rail .card-heading {
+  gap: 3px !important;
+}
+
+.chapter-button {
+  justify-content: start !important;
+  align-items: start !important;
+  border-radius: 3px !important;
+  padding: 12px !important;
+  background: #faf8f3 !important;
+  box-shadow: none !important;
+}
+
+.chapter-button:hover,
+.chapter-button.active {
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+.chapter-button.active {
+  background: #eef1ee !important;
+  border-color: rgba(15, 53, 87, 0.24) !important;
+}
+
+.writing-toolbar {
+  justify-content: space-between !important;
+  padding-bottom: 2px !important;
+  border-bottom: 1px solid var(--stitch-line-soft) !important;
+}
+
+.paragraph {
+  gap: 0 !important;
+  border-radius: 3px !important;
+  overflow: hidden !important;
+}
+
+.paragraph textarea {
+  min-height: 210px !important;
+  padding: 18px 18px 14px !important;
+}
+
+.custom-instruction {
+  border-top: 1px solid var(--stitch-line-soft) !important;
+  padding-top: 10px !important;
+}
+
+.custom-instruction label {
+  font-size: 0.74rem !important;
+  letter-spacing: 0.12em !important;
+  text-transform: uppercase !important;
+  color: var(--stitch-copy) !important;
+  font-weight: 700 !important;
+}
+
+.custom-instruction textarea {
+  min-height: 110px !important;
+  padding: 14px !important;
+  border: 1px solid var(--stitch-line-soft) !important;
+  border-radius: 3px !important;
+}
+
+.paragraph-actions,
+.editor-actions {
+  padding: 10px 12px 12px !important;
+  background: #f7f5ef !important;
+  border-top: 1px solid var(--stitch-line-soft) !important;
+}
+
+.small-button {
+  min-height: 30px !important;
+  padding: 0 10px !important;
+  border-radius: 3px !important;
+  background: #fffef9 !important;
+  box-shadow: none !important;
+}
+
+.empty-chapter,
+.message,
+.ai-analysis,
+.analysis-scorecard,
+.writing-side-card {
+  border-radius: 3px !important;
+}
+
+.empty-chapter,
+.message {
+  background: #f7f5ef !important;
+  border: 1px solid var(--stitch-line-soft) !important;
+}
+
+.analysis-scorecard--pass,
+.analysis-scorecard--warn {
+  background: #f7f5ef !important;
+  border: 1px solid var(--stitch-line-soft) !important;
+}
+
+.analysis-status {
+  border-radius: 3px !important;
+  min-height: 24px !important;
+  padding: 0 8px !important;
+}
+
+.progress-bar {
+  height: 4px !important;
+  border-radius: 0 !important;
+}
+
+.progress-fill {
+  background: var(--stitch-navy) !important;
+}
+
+.writing-side-card {
+  gap: 8px !important;
+  background: #f9f8f3 !important;
+}
+
+.writing-side-card strong,
+.criterion__head span:first-child {
+  color: var(--stitch-text) !important;
+}
+
+.writing-inline-meta,
+.criterion__feedback,
+.chapter-stats {
+  font-size: 0.78rem !important;
+}
+
+@media (max-width: 720px) {
+  .paragraph textarea {
+    min-height: 160px !important;
+    padding: 14px 14px 12px !important;
+  }
+
+  .writing-toolbar,
+  .paragraph-actions,
+  .editor-actions {
+    padding-left: 10px !important;
+    padding-right: 10px !important;
+  }
+}
+
+/* Stitch References And Export Polish */
+.stitch-tab-navigation {
+  gap: 8px !important;
+}
+
+.stitch-tab-button {
+  min-height: 34px !important;
+  padding: 0 12px !important;
+  border-radius: 3px !important;
+  font-weight: 700 !important;
+}
+
+.stitch-tab-button.active {
+  background: #eef1ee !important;
+  border-color: rgba(15, 53, 87, 0.24) !important;
+  color: var(--stitch-text) !important;
+}
+
+.manager-header,
+.reference-toolbar,
+.search-header,
+.import-header,
+.detail-header {
+  gap: 10px !important;
+}
+
+.manager-header {
+  padding-bottom: 10px !important;
+  border-bottom: 1px solid var(--stitch-line-soft) !important;
+}
+
+.reference-item,
+.version-record,
+.empty-state,
+.detail-content,
+.reference-search,
+.reference-import,
+.reference-detail,
+.import-textarea,
+.keyword-tag,
+.decision-metric,
+.export-format-card {
+  border-radius: 3px !important;
+  box-shadow: none !important;
+  background-image: none !important;
+}
+
+.reference-item,
+.version-record,
+.detail-content,
+.reference-search,
+.reference-import,
+.reference-detail {
+  border: 1px solid var(--stitch-line-soft) !important;
+  background: #faf8f3 !important;
+}
+
+.reference-item,
+.version-record {
+  padding: 12px !important;
+}
+
+.version-record:hover,
+.version-record.selected {
+  transform: none !important;
+  box-shadow: none !important;
+  background: #eef1ee !important;
+  border-color: rgba(15, 53, 87, 0.24) !important;
+}
+
+.search-box {
+  gap: 8px !important;
+}
+
+.import-textarea {
+  min-height: 240px !important;
+  padding: 14px !important;
+  border: 1px solid var(--stitch-line-soft) !important;
+  background: #fcfbf7 !important;
+}
+
+.text-button {
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  color: var(--stitch-navy) !important;
+}
+
+.keyword-tag {
+  padding: 0 8px !important;
+  min-height: 26px !important;
+  background: #f2efe6 !important;
+  color: var(--stitch-text) !important;
+}
+
+.reference-command-grid,
+.export-support-grid,
+.fulltext-review-grid {
+  gap: 12px !important;
+}
+
+.export-format-card {
+  padding: 12px !important;
+  background: #faf8f3 !important;
+}
+
+.export-format-card.choice-card--active {
+  background: #eef1ee !important;
+}
+
+.export-format-card .line-item__head {
+  align-items: center !important;
+}
+
+@media (max-width: 720px) {
+  .stitch-tab-navigation {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 6px !important;
+  }
+
+  .stitch-tab-button {
+    min-height: 36px !important;
+    padding: 0 8px !important;
+  }
+
+  .import-textarea {
+    min-height: 190px !important;
+  }
+}
+
+/* Home And Title Correction */
+.stitch-command-home--compact {
+  grid-template-columns: minmax(0, 1fr) 320px !important;
+  align-items: start !important;
+  min-height: 0 !important;
+}
+
+.stitch-command-home--compact .stitch-command-home__main {
+  gap: 12px !important;
+}
+
+.stitch-home-heading {
+  display: grid !important;
+  gap: 6px !important;
+}
+
+.stitch-home-heading h1 {
+  margin: 0 !important;
+  font-family: "Noto Serif SC", "Source Han Serif SC", "Songti SC", serif !important;
+  font-size: clamp(2rem, 3vw, 2.7rem) !important;
+  line-height: 1.05 !important;
+  letter-spacing: -0.06em !important;
+  color: var(--stitch-text) !important;
+  white-space: nowrap !important;
+}
+
+.stitch-home-heading p {
+  margin: 0 !important;
+  max-width: 58ch !important;
+  color: var(--stitch-copy) !important;
+}
+
+.stitch-home-inline-summary {
+  display: grid !important;
+  grid-template-columns: 180px minmax(0, 1fr) 240px !important;
+  gap: 8px !important;
+}
+
+.stitch-home-inline-summary__item {
+  display: grid !important;
+  gap: 4px !important;
+  min-height: 0 !important;
+  padding: 10px 12px !important;
+  border: 1px solid var(--stitch-line-soft) !important;
+  background: #faf8f3 !important;
+}
+
+.stitch-home-inline-summary__item span {
+  font-size: 0.74rem !important;
+  letter-spacing: 0.12em !important;
+  text-transform: uppercase !important;
+  color: var(--stitch-copy) !important;
+  font-weight: 700 !important;
+}
+
+.stitch-home-inline-summary__item strong {
+  line-height: 1.45 !important;
+  color: var(--stitch-text) !important;
+}
+
+.stitch-command-home--compact .stitch-command-home__actions {
+  padding-top: 2px !important;
+}
+
+.stitch-command-home--compact .stitch-command-home__rail {
+  grid-template-rows: auto auto !important;
+}
+
+.stitch-command-home--compact .stitch-brief-card {
+  min-height: 0 !important;
+}
+
+.project-summary__copy h1 {
+  max-width: none !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  font-size: clamp(2.4rem, 3vw, 3.4rem) !important;
+  letter-spacing: -0.08em !important;
+}
+
+@media (max-width: 1040px) {
+  .stitch-home-inline-summary {
+    grid-template-columns: 1fr !important;
+  }
+
+  .stitch-home-heading h1,
+  .project-summary__copy h1 {
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+  }
+}
+
+@media (max-width: 720px) {
+  .stitch-home-heading h1 {
+    font-size: clamp(1.7rem, 7vw, 2.1rem) !important;
+  }
+
+  .stitch-command-home--compact {
+    gap: 10px !important;
+  }
+}
+
+/* Global Title Normalization */
+.stitch-title-stack,
+.stitch-title-stack--tight {
+  display: block !important;
+  gap: 0 !important;
+}
+
+.stitch-title-stack span,
+.stitch-title-stack--tight span {
+  display: inline !important;
+}
+
+.stitch-title-stack span + span::before,
+.stitch-title-stack--tight span + span::before {
+  content: " ";
+}
+
+.stitch-home-heading h1,
+.overview-cockpit__main h2,
+.writing-command-deck--stitch h2,
+.decision-stage-hero__main h2,
+.project-summary__copy h1 {
+  font-family: "Noto Serif SC", "Source Han Serif SC", "Songti SC", serif !important;
+  font-size: clamp(1.55rem, 2vw, 2rem) !important;
+  line-height: 1.22 !important;
+  letter-spacing: -0.035em !important;
+  font-weight: 700 !important;
+  max-width: none !important;
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  text-wrap: pretty !important;
+}
+
+.stitch-home-heading h1 {
+  font-size: clamp(1.65rem, 2.2vw, 2.15rem) !important;
+}
+
+.project-summary__copy h1 {
+  font-size: clamp(1.7rem, 2.3vw, 2.2rem) !important;
+}
+
+.project-summary__body,
+.project-shell:has(.writing-page) .project-summary__body,
+.project-shell:has(.references-page) .project-summary__body,
+.project-shell:has(.export-page) .project-summary__body {
+  grid-template-columns: 1fr !important;
+  gap: 10px !important;
+}
+
+.project-summary__signals {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+}
+
+.project-summary__copy {
+  min-width: 0 !important;
+}
+
+.stitch-command-home__main,
+.overview-cockpit__main,
+.writing-command-deck__main,
+.decision-stage-hero__main,
+.project-summary__copy {
+  gap: 8px !important;
+}
+
+@media (max-width: 720px) {
+  .stitch-home-heading h1,
+  .overview-cockpit__main h2,
+  .writing-command-deck--stitch h2,
+  .decision-stage-hero__main h2,
+  .project-summary__copy h1 {
+    font-size: clamp(1.35rem, 5.6vw, 1.75rem) !important;
+    line-height: 1.24 !important;
+    letter-spacing: -0.02em !important;
+  }
+}
+
+/* Final Hero Title Reset */
+.overview-cockpit__main h2,
+.writing-command-deck--stitch h2,
+.decision-stage-hero__main h2,
+.project-summary__copy h1,
+.project-shell:has(.writing-page) .project-summary__copy h1,
+.project-shell:has(.references-page) .project-summary__copy h1,
+.project-shell:has(.export-page) .project-summary__copy h1 {
+  font-family: "Noto Serif SC", "Source Han Serif SC", "Songti SC", serif !important;
+  font-size: clamp(1.55rem, 2vw, 2rem) !important;
+  line-height: 1.22 !important;
+  letter-spacing: -0.03em !important;
+  font-weight: 700 !important;
+  max-width: none !important;
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  text-wrap: pretty !important;
+}
+
+.project-summary__copy,
+.project-shell:has(.writing-page) .project-summary__copy,
+.project-shell:has(.references-page) .project-summary__copy,
+.project-shell:has(.export-page) .project-summary__copy {
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
+}
+
+.project-summary__body,
+.project-shell:has(.writing-page) .project-summary__body,
+.project-shell:has(.references-page) .project-summary__body,
+.project-shell:has(.export-page) .project-summary__body {
+  grid-template-columns: 1fr !important;
+  align-items: start !important;
+  gap: 10px !important;
+}
+
+.project-summary__signals,
+.project-shell:has(.writing-page) .project-summary__signals,
+.project-shell:has(.references-page) .project-summary__signals,
+.project-shell:has(.export-page) .project-summary__signals {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  justify-content: flex-start !important;
+  align-items: center !important;
+  width: 100% !important;
+}
+
+.stitch-title-stack,
+.stitch-title-stack--tight {
+  display: inline !important;
+}
+
+.stitch-title-stack span,
+.stitch-title-stack--tight span {
+  display: inline !important;
+}
+
+.stitch-title-stack span + span::before,
+.stitch-title-stack--tight span + span::before {
+  content: " " !important;
+}
+
+@media (max-width: 720px) {
+  .overview-cockpit__main h2,
+  .writing-command-deck--stitch h2,
+  .decision-stage-hero__main h2,
+  .project-summary__copy h1,
+  .project-shell:has(.writing-page) .project-summary__copy h1,
+  .project-shell:has(.references-page) .project-summary__copy h1,
+  .project-shell:has(.export-page) .project-summary__copy h1 {
+    font-size: clamp(1.35rem, 5.4vw, 1.72rem) !important;
+    line-height: 1.24 !important;
+    letter-spacing: -0.02em !important;
+  }
+}
+
+/* Final Editorial Type System */
+.home-page--stitch .stitch-home-heading h1,
+.project-shell .project-summary__copy h1,
+.project-shell .project-hero__copy h2,
+.project-shell .overview-cockpit__main h2,
+.project-shell .writing-command-deck--stitch h2,
+.project-shell .decision-stage-hero__main h2,
+.project-shell .grid-header h2 {
+  font-family: "Noto Serif SC", "Source Han Serif SC", "Songti SC", serif !important;
+  color: var(--stitch-text) !important;
+  letter-spacing: -0.028em !important;
+}
+
+.home-page--stitch .stitch-home-heading h1,
+.project-shell .project-summary__copy h1 {
+  font-size: clamp(1.7rem, 2.2vw, 2.15rem) !important;
+  line-height: 1.2 !important;
+  font-weight: 700 !important;
+}
+
+.project-shell .project-hero__copy h2,
+.project-shell .overview-cockpit__main h2,
+.project-shell .writing-command-deck--stitch h2,
+.project-shell .decision-stage-hero__main h2,
+.project-shell .grid-header h2 {
+  font-size: clamp(1.45rem, 1.9vw, 1.82rem) !important;
+  line-height: 1.28 !important;
+  font-weight: 700 !important;
+  max-width: 24ch !important;
+}
+
+.project-shell .card-heading h2,
+.project-shell .card-heading h3,
+.home-page--stitch .card-heading h2,
+.home-page--stitch .card-heading h3,
+.fulltext-review-grid .content-card h3,
+.writing-studio-layout .content-card h2,
+.writing-studio-layout .content-card h3 {
+  font-family: "Noto Sans SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif !important;
+  font-size: clamp(1.02rem, 1.28vw, 1.16rem) !important;
+  line-height: 1.45 !important;
+  letter-spacing: -0.01em !important;
+  font-weight: 700 !important;
+  color: var(--stitch-text) !important;
+}
+
+.eyebrow,
+.stitch-home-inline-summary__item span,
+.overview-cockpit__metric span,
+.decision-metric span,
+.chapter-status,
+.writing-inline-meta {
+  font-family: "Noto Sans SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif !important;
+  font-size: 0.72rem !important;
+  line-height: 1.3 !important;
+  letter-spacing: 0.12em !important;
+  text-transform: uppercase !important;
+}
+
+.project-shell .project-summary__copy p,
+.project-shell .project-hero__copy p,
+.project-shell .overview-cockpit__main p,
+.project-shell .decision-stage-hero__main p,
+.home-page--stitch .card-heading p,
+.home-page--stitch .grid-header p,
+.home-page--stitch .stitch-home-heading p,
+.writing-studio-layout p,
+.fulltext-review-grid p,
+.content-card p,
+.content-card li {
+  font-family: "Noto Sans SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif !important;
+  font-size: 0.96rem !important;
+  line-height: 1.72 !important;
+  color: var(--stitch-copy) !important;
+}
+
+.project-shell .project-hero {
+  grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr) !important;
+  gap: 14px !important;
+}
+
+.project-shell .project-hero__copy,
+.project-shell .project-summary__note {
+  gap: 8px !important;
+}
+
+/* Home Compaction */
+.stitch-home-grid {
+  grid-template-columns: minmax(0, 0.94fr) minmax(0, 1.06fr) !important;
+  align-items: start !important;
+  gap: 14px !important;
+}
+
+.stitch-home-grid__main,
+.stitch-home-grid__side {
+  display: grid !important;
+  align-content: start !important;
+  align-self: start !important;
+  height: max-content !important;
+  gap: 14px !important;
+  min-width: 0 !important;
+}
+
+.stitch-home-grid__main > *,
+.stitch-home-grid__side > * {
+  min-height: 0 !important;
+}
+
+.stitch-home-grid .content-card {
+  padding: 14px 16px !important;
+}
+
+.stitch-home-grid .stitch-panel--flow {
+  min-width: 0 !important;
+}
+
+.stitch-home-grid .paper-type-selector--compact {
+  min-width: 0 !important;
+}
+
+.stitch-home-grid .card-heading {
+  gap: 6px !important;
+}
+
+.stitch-home-grid .card-heading h2,
+.stitch-home-grid .card-heading h3 {
+  max-width: 24ch !important;
+}
+
+.stitch-flow-board {
+  gap: 10px !important;
+}
+
+.stitch-flow-step {
+  padding: 10px 12px !important;
+}
+
+.stitch-projects-panel--home {
+  background: #fbfaf6 !important;
+  border: 1px solid var(--stitch-line-soft) !important;
+  box-shadow: none !important;
+}
+
+.stitch-projects-panel--home .grid-header {
+  gap: 8px !important;
+}
+
+.stitch-projects-panel--home .grid-header p {
+  max-width: 42ch !important;
+}
+
+.stitch-projects-panel--home .project-grid--home {
+  grid-template-columns: 1fr !important;
+  gap: 12px !important;
+}
+
+.stitch-projects-panel--home .project-card {
+  min-height: 0 !important;
+}
+
+.stitch-flow-step strong {
+  font-family: "Noto Sans SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif !important;
+  font-size: 0.98rem !important;
+  line-height: 1.42 !important;
+}
+
+.stitch-flow-step p {
+  font-size: 0.9rem !important;
+  line-height: 1.6 !important;
+}
+
+/* Writing Surface Polish */
+.writing-studio-layout {
+  grid-template-columns: 232px minmax(0, 1fr) 296px !important;
+  gap: 14px !important;
+}
+
+.writing-studio-main .card-heading,
+.writing-studio-sidebar .card-heading,
+.writing-studio-rail .card-heading {
+  gap: 6px !important;
+}
+
+.writing-toolbar {
+  justify-content: flex-start !important;
+  align-items: center !important;
+  padding-bottom: 10px !important;
+  border-bottom: 1px solid var(--stitch-line-soft) !important;
+}
+
+.chapter-editor {
+  gap: 14px !important;
+}
+
+.paragraphs {
+  display: grid !important;
+  gap: 14px !important;
+}
+
+.paragraph {
+  border: 1px solid var(--stitch-line-soft) !important;
+  background: #fffdf8 !important;
+}
+
+.paragraph textarea {
+  min-height: 240px !important;
+  padding: 22px 24px 18px !important;
+  font-family: "Noto Sans SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif !important;
+  font-size: 1rem !important;
+  line-height: 1.92 !important;
+  color: var(--stitch-text) !important;
+  background: #fffdf8 !important;
+}
+
+.paragraph-actions,
+.editor-actions {
+  justify-content: flex-start !important;
+}
+
+.editor-actions {
+  padding-top: 10px !important;
+  border-top: 1px solid var(--stitch-line-soft) !important;
+}
+
+.custom-instruction {
+  display: grid !important;
+  gap: 8px !important;
+}
+
+.custom-instruction textarea {
+  min-height: 136px !important;
+  padding: 14px 16px !important;
+  font-family: "Noto Sans SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif !important;
+  font-size: 0.96rem !important;
+  line-height: 1.78 !important;
+  background: #fffdf8 !important;
+}
+
+/* Final Review Reading Surface */
+.fulltext-review-grid {
+  grid-template-columns: minmax(0, 1.16fr) minmax(320px, 0.84fr) !important;
+  gap: 14px !important;
+}
+
+.fulltext-surface {
+  padding: 22px 24px !important;
+  background: #fffdf8 !important;
+}
+
+.fulltext-surface h4 {
+  margin: 0 0 10px !important;
+  font-family: "Noto Sans SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif !important;
+  font-size: 0.8rem !important;
+  line-height: 1.3 !important;
+  letter-spacing: 0.12em !important;
+  text-transform: uppercase !important;
+  color: var(--stitch-copy) !important;
+}
+
+.fulltext-surface p {
+  margin: 0 0 14px !important;
+  max-width: 72ch !important;
+  font-family: "Noto Sans SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif !important;
+  font-size: 1rem !important;
+  line-height: 1.92 !important;
+  color: var(--stitch-text) !important;
+}
+
+.paper-preview-block {
+  display: grid !important;
+  gap: 4px !important;
+  padding-top: 4px !important;
+}
+
+/* Anti-Strip Layout Guard */
+.stitch-flow-board {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  align-items: stretch !important;
+  gap: 12px !important;
+}
+
+.stitch-flow-board > * {
+  min-width: 0 !important;
+}
+
+.stitch-flow-step {
+  align-content: start !important;
+  min-height: 214px !important;
+  gap: 10px !important;
+  padding: 14px !important;
+}
+
+.stitch-flow-step span {
+  min-width: 44px !important;
+  justify-content: center !important;
+}
+
+.stitch-flow-step strong,
+.stitch-flow-step p {
+  max-width: none !important;
+}
+
+.overview-cockpit__metrics,
+.decision-metrics,
+.project-card__summary,
+.stitch-home-inline-summary {
+  align-items: stretch !important;
+}
+
+.overview-cockpit__metric,
+.decision-metric,
+.stitch-home-inline-summary__item,
+.project-card__summary > * {
+  min-width: 0 !important;
+}
+
+/* Compact Home Research Setup */
+.paper-type-selector--compact {
+  gap: 12px !important;
+}
+
+.paper-type-selector--compact > .content-card {
+  padding: 10px 12px !important;
+}
+
+.paper-type-compact-summary {
+  gap: 8px !important;
+}
+
+.paper-type-compact-grid {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+  gap: 10px !important;
+}
+
+.paper-type-compact-block {
+  display: grid !important;
+  align-content: start !important;
+  gap: 8px !important;
+}
+
+.paper-type-compact-block > strong {
+  font-family: "Noto Sans SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif !important;
+  font-size: 0.98rem !important;
+  line-height: 1.4 !important;
+  color: var(--stitch-text) !important;
+}
+
+.paper-type-compact-tags {
+  display: grid !important;
+  gap: 8px !important;
+}
+
+.paper-type-compact-tag {
+  display: grid !important;
+  gap: 4px !important;
+  padding: 8px 10px !important;
+  border: 1px solid var(--stitch-line-soft) !important;
+  background: #fffdf8 !important;
+}
+
+.paper-type-compact-tag span {
+  font-family: "Noto Sans SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif !important;
+  font-size: 0.72rem !important;
+  line-height: 1.3 !important;
+  letter-spacing: 0.12em !important;
+  text-transform: uppercase !important;
+  color: var(--stitch-copy) !important;
+}
+
+.paper-type-compact-tag strong {
+  font-family: "Noto Sans SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif !important;
+  font-size: 0.95rem !important;
+  line-height: 1.45 !important;
+  color: var(--stitch-text) !important;
+}
+
+/* Overview / Export / Cards Cleanup */
+.overview-support-grid,
+.export-support-grid {
+  gap: 14px !important;
+}
+
+.overview-support-grid {
+  grid-template-columns: minmax(0, 1.02fr) minmax(320px, 0.98fr) !important;
+  align-items: start !important;
+}
+
+.overview-support-grid .content-card,
+.export-support-grid .content-card,
+.fulltext-review-rail .content-card,
+.archive-panel,
+.version-history .version-record,
+.stitch-projects-panel .project-card {
+  background: #fbfaf6 !important;
+  border: 1px solid var(--stitch-line-soft) !important;
+  box-shadow: none !important;
+}
+
+.overview-support-grid .line-item,
+.export-support-grid .line-item,
+.fulltext-review-rail .line-item,
+.archive-panel__card,
+.version-record {
+  padding: 12px !important;
+  border: 1px solid var(--stitch-line-soft) !important;
+  background: #fffdf8 !important;
+}
+
+.project-card {
+  transform: none !important;
+}
+
+.project-card:hover,
+.project-card:active {
+  transform: none !important;
+  box-shadow: none !important;
+  border-color: rgba(15, 53, 87, 0.18) !important;
+  background: #f9f8f3 !important;
+}
+
+.project-card__summary {
+  grid-template-columns: 1fr !important;
+  gap: 8px !important;
+}
+
+.project-card__summary-copy {
+  padding: 10px 12px !important;
+  border: 1px solid var(--stitch-line-soft) !important;
+  background: #fffdf8 !important;
+}
+
+.archive-panel__grid {
+  gap: 12px !important;
+}
+
+.overview-support-grid .content-card h3,
+.export-support-grid .content-card h3,
+.fulltext-review-rail .content-card h3 {
+  font-size: 1rem !important;
+  line-height: 1.42 !important;
+}
+
+.overview-support-grid .line-item,
+.export-support-grid .line-item,
+.fulltext-review-rail .line-item {
+  gap: 8px !important;
+}
+
+.fulltext-review-grid {
+  grid-template-columns: minmax(0, 1.22fr) minmax(300px, 0.78fr) !important;
+}
+
+.fulltext-surface {
+  border: 1px solid var(--stitch-line-soft) !important;
+}
+
+.paper-preview-block {
+  gap: 6px !important;
+  padding: 8px 0 12px !important;
+  border-bottom: 1px solid var(--stitch-line-soft) !important;
+}
+
+.paper-preview-block:last-child {
+  padding-bottom: 0 !important;
+  border-bottom: 0 !important;
+}
+
+@media (max-width: 1180px) {
+  .stitch-home-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .stitch-home-grid__main,
+  .stitch-home-grid__side {
+    gap: 12px !important;
+  }
+
+  .stitch-flow-board {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .paper-type-compact-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .overview-support-grid,
+  .export-support-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 720px) {
+  .project-shell .project-hero__copy h2,
+  .project-shell .overview-cockpit__main h2,
+  .project-shell .writing-command-deck--stitch h2,
+  .project-shell .decision-stage-hero__main h2,
+  .project-shell .grid-header h2 {
+    font-size: clamp(1.28rem, 5vw, 1.58rem) !important;
+    line-height: 1.3 !important;
+  }
+
+  .writing-studio-layout,
+  .fulltext-review-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .stitch-flow-board {
+    grid-template-columns: 1fr !important;
+  }
+
+  .paper-type-compact-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .paragraph textarea {
+    min-height: 180px !important;
+    padding: 16px 16px 14px !important;
+  }
+
+  .fulltext-surface {
+    padding: 16px !important;
+  }
+}

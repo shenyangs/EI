@@ -239,6 +239,7 @@ export default function NewProjectPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [applyingDirectionId, setApplyingDirectionId] = useState<string | null>(null);
+  const [selectedDirectionForOutline, setSelectedDirectionForOutline] = useState<AiDirection | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [aiAnalysis, setAiAnalysis] = useState<AiAnalysisResult | null>(null);
@@ -261,6 +262,7 @@ export default function NewProjectPage() {
     setIsAnalyzing(true);
     setError("");
     setNotice("");
+    setSelectedDirectionForOutline(null);
 
     const currentInput: ProjectIdeaInput = {
       title,
@@ -442,7 +444,21 @@ export default function NewProjectPage() {
 
       if (data?.ok && data.project?.id) {
         const targetVenueId = data.project.venueId || venueId;
-        window.location.href = `/projects/${data.project.id}/outline?venue=${encodeURIComponent(targetVenueId)}`;
+        const outlineParams = new URLSearchParams({
+          venue: targetVenueId,
+          title: title.trim() || "未命名研究主题"
+        });
+
+        if (selectedDirectionForOutline?.label) {
+          outlineParams.set("direction", selectedDirectionForOutline.label);
+          outlineParams.set("directionId", selectedDirectionForOutline.id);
+
+          if (selectedDirectionForOutline.description.trim()) {
+            outlineParams.set("directionDescription", selectedDirectionForOutline.description);
+          }
+        }
+
+        window.location.href = `/projects/${data.project.id}/outline?${outlineParams.toString()}`;
       } else {
         throw new Error(data?.error || "项目创建接口没有返回有效的项目编号。");
       }
@@ -456,6 +472,7 @@ export default function NewProjectPage() {
   function applyDirectionToForm(direction: AiDirection) {
     setApplyingDirectionId(direction.id);
     setError("");
+    setSelectedDirectionForOutline(direction);
 
     try {
       const nextValues = buildFieldsFromDirection(direction, {

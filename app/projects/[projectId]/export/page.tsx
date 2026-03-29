@@ -46,12 +46,12 @@ export default async function ExportPage({
 
   return (
     <div className="workbench-stack export-page export-page--stitch">
-      <section className="decision-stage-hero">
+      <section className="decision-stage-hero compact-stage-hero">
         <div className="decision-stage-hero__main">
           <span className="eyebrow">Final Review</span>
-          <h2>先通读完整稿，再决定这是不是当前要冻结的导出版本。</h2>
+          <h2>先通读完整稿，再决定是否冻结这一版。</h2>
           <p>
-            全文页负责做最后一轮全局检查。这里要解决的不是“还能不能继续改”，而是“当前这一版能不能作为正式导出基线”。
+            这里做最后一轮全局检查，重点不是还能不能改，而是这一版能不能作为正式导出基线。
           </p>
         </div>
         <aside className="decision-stage-hero__rail">

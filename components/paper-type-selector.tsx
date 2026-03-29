@@ -14,15 +14,27 @@ import {
 type PaperTypeSelectorProps = {
   onTypeChange?: (paperType: PaperCategory) => void;
   initialType?: PaperCategory;
+  compact?: boolean;
 };
 
-export function PaperTypeSelector({ onTypeChange, initialType }: PaperTypeSelectorProps) {
+export function PaperTypeSelector({ onTypeChange, initialType, compact = false }: PaperTypeSelectorProps) {
   const [selectedType, setSelectedType] = useState<PaperCategory>(initialType ?? "ei-conference");
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [aiGuidance, setAiGuidance] = useState<string>("");
   const [isLoadingGuidance, setIsLoadingGuidance] = useState(false);
 
   const selectedProfile = getPaperTypeById(selectedType);
+  const compactRequirements = [
+    { label: "摘要", value: selectedProfile.requirements.abstract.split("，")[0] },
+    { label: "篇幅", value: selectedProfile.requirements.length.split("，")[0] },
+    { label: "结构", value: selectedProfile.requirements.structure.split("，")[0] }
+  ];
+
+  const compactFocus = [
+    { label: "语调", value: selectedProfile.writingStyle.tone.split("，")[0] },
+    { label: "深度", value: selectedProfile.writingStyle.depth.split("，")[0] },
+    { label: "读者", value: selectedProfile.writingStyle.audience.split("和")[0] }
+  ];
 
   const handleTypeSelect = (typeId: PaperCategory) => {
     setSelectedType(typeId);
@@ -61,7 +73,7 @@ export function PaperTypeSelector({ onTypeChange, initialType }: PaperTypeSelect
   }, [selectedType]);
 
   return (
-    <div className="workbench-stack">
+    <div className={`workbench-stack ${compact ? "paper-type-selector--compact" : ""}`}>
       <section className="content-card content-card--accent">
         <div className="card-heading card-heading--stack">
           <span className="eyebrow">论文类型</span>
@@ -79,7 +91,11 @@ export function PaperTypeSelector({ onTypeChange, initialType }: PaperTypeSelect
         </div>
 
         <div className="top-gap">
-          <div className="choice-card" style={{ cursor: 'pointer' }} onClick={() => setIsDropdownOpen(!isDropdownOpen)}>
+          <button
+            className="choice-card paper-type-trigger"
+            type="button"
+            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+          >
             <div className="line-item__head">
               <strong>点击选择论文类型</strong>
               <span className="paper-type__meta-text">
@@ -89,29 +105,17 @@ export function PaperTypeSelector({ onTypeChange, initialType }: PaperTypeSelect
             <p className="paper-type__description">
               EI会议 · SCI期刊 · 核心期刊 · 学位论文 · 学术会议 · 技术文章
             </p>
-          </div>
+          </button>
 
           {isDropdownOpen && (
-            <div className="stack-list top-gap" style={{ 
-              background: 'var(--surface)',
-              borderRadius: 'var(--radius-lg)',
-              border: '1px solid var(--border)',
-              boxShadow: 'var(--shadow)',
-              padding: '16px',
-              marginTop: '8px',
-              position: 'relative',
-              zIndex: '9999'
-            }}>
+            <div className="stack-list top-gap paper-type-dropdown">
               {paperTypeProfiles.map((profile) => {
                 const isSelected = profile.id === selectedType;
                 return (
-                  <div 
+                  <button
                     key={profile.id}
-                    className={isSelected ? "choice-card choice-card--active" : "choice-card"}
-                    style={{ 
-                      marginBottom: '8px',
-                      cursor: 'pointer'
-                    }}
+                    className={isSelected ? "choice-card choice-card--active paper-type-option" : "choice-card paper-type-option"}
+                    type="button"
                     onClick={() => handleTypeSelect(profile.id)}
                   >
                     <div className="line-item__head">
@@ -124,7 +128,7 @@ export function PaperTypeSelector({ onTypeChange, initialType }: PaperTypeSelect
                       </StatusBadge>
                     </div>
                     <p className="paper-type__hint">{profile.description}</p>
-                  </div>
+                  </button>
                 );
               })}
             </div>
@@ -132,36 +136,71 @@ export function PaperTypeSelector({ onTypeChange, initialType }: PaperTypeSelect
         </div>
       </section>
 
+      {compact ? (
+        <section className="content-card paper-type-compact-summary">
+          <div className="card-heading card-heading--stack">
+            <span className="eyebrow">当前约束</span>
+            <h3>首页只保留最关键的 3 条要求</h3>
+            <p>更详细的引导、投稿平台和完整流程，进入新项目后再继续展开。</p>
+          </div>
+          <div className="paper-type-compact-grid top-gap">
+            <div className="paper-type-compact-block">
+              <strong>核心要求</strong>
+              <div className="paper-type-compact-tags top-gap">
+                {compactRequirements.map((item) => (
+                  <div key={item.label} className="paper-type-compact-tag">
+                    <span>{item.label}</span>
+                    <strong>{item.value}</strong>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="paper-type-compact-block">
+              <strong>写作取向</strong>
+              <div className="paper-type-compact-tags top-gap">
+                {compactFocus.map((item) => (
+                  <div key={item.label} className="paper-type-compact-tag">
+                    <span>{item.label}</span>
+                    <strong>{item.value}</strong>
+                  </div>
+                ))}
+              </div>
+              <div className="button-row top-gap">
+                <Link
+                  className="primary-button"
+                  href={`/projects/new?paperType=${selectedType}`}
+                >
+                  开始创作{selectedProfile.shortName}
+                </Link>
+              </div>
+            </div>
+          </div>
+        </section>
+      ) : (
+        <>
       <section className="content-card">
         <div className="card-heading card-heading--stack">
           <span className="eyebrow">格式要求</span>
           <h3>{selectedProfile.name}的核心要求</h3>
         </div>
         <div className="stack-list">
-          <div className="line-item line-item--column">
-            <strong>📝 摘要要求</strong>
-            <span>{selectedProfile.requirements.abstract}</span>
-          </div>
-          <div className="line-item line-item--column">
-            <strong>🏷️ 关键词要求</strong>
-            <span>{selectedProfile.requirements.keywords}</span>
-          </div>
-          <div className="line-item line-item--column">
-            <strong>📄 篇幅要求</strong>
-            <span>{selectedProfile.requirements.length}</span>
-          </div>
-          <div className="line-item line-item--column">
-            <strong>📑 结构要求</strong>
-            <span>{selectedProfile.requirements.structure}</span>
-          </div>
-          <div className="line-item line-item--column">
-            <strong>📚 参考文献要求</strong>
-            <span>{selectedProfile.requirements.references}</span>
-          </div>
-          <div className="line-item line-item--column">
-            <strong>📊 图表要求</strong>
-            <span>{selectedProfile.requirements.figures}</span>
-          </div>
+          {(compact
+            ? compactRequirements
+            : [
+                { label: "摘要要求", value: selectedProfile.requirements.abstract },
+                { label: "关键词要求", value: selectedProfile.requirements.keywords },
+                { label: "篇幅要求", value: selectedProfile.requirements.length },
+                { label: "结构要求", value: selectedProfile.requirements.structure },
+                { label: "参考文献要求", value: selectedProfile.requirements.references },
+                { label: "图表要求", value: selectedProfile.requirements.figures }
+              ]
+          ).map((item) => (
+            <div key={item.label} className="line-item line-item--column">
+              <strong>{item.label}</strong>
+              <span>{item.value}</span>
+            </div>
+          ))}
         </div>
       </section>
 
@@ -185,7 +224,6 @@ export function PaperTypeSelector({ onTypeChange, initialType }: PaperTypeSelect
           </div>
         </div>
       </section>
-
       <section className="content-card">
         <div className="card-heading card-heading--stack">
           <span className="eyebrow">AI智能引导</span>
@@ -251,6 +289,8 @@ export function PaperTypeSelector({ onTypeChange, initialType }: PaperTypeSelect
           ))}
         </div>
       </section>
+        </>
+      )}
     </div>
   );
 }

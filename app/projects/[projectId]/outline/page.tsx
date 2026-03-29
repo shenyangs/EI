@@ -9,10 +9,16 @@ export default async function OutlinePage({
   searchParams
 }: {
   params: Promise<{ projectId: string }>;
-  searchParams: Promise<{ venue?: string; title?: string; direction?: string; directionId?: string }>;
+  searchParams: Promise<{
+    venue?: string;
+    title?: string;
+    direction?: string;
+    directionId?: string;
+    directionDescription?: string;
+  }>;
 }) {
   const { projectId } = await params;
-  const { venue, title, direction, directionId } = await searchParams;
+  const { venue, title, direction, directionId, directionDescription } = await searchParams;
   const project = await getProjectViewById(projectId);
   const venueProfile = getVenueProfileById(venue);
 
@@ -46,7 +52,7 @@ export default async function OutlinePage({
         selectedDirection={direction ? {
           id: directionId || "direction-1",
           label: direction,
-          description: ""
+          description: directionDescription || ""
         } : undefined}
       />
     </div>

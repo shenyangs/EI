@@ -22,19 +22,22 @@ export default async function WritingPage({
 
   return (
     <div className="workbench-stack writing-page">
-      <section className="writing-command-deck writing-command-deck--stitch">
+      <section className="writing-command-deck writing-command-deck--stitch compact-stage-hero">
         <div className="writing-command-deck__main">
           <span className="eyebrow">Writing Studio</span>
-          <h2>逐章处理正文、证据和质量，不再把写作与检查割裂开。</h2>
+          <h2 className="stitch-title-stack stitch-title-stack--tight">
+            <span>逐章处理正文、</span>
+            <span>证据和质量。</span>
+          </h2>
           <p>
-            这页现在是完整的写作工作台。左边切章节，中间写正文，右边看质量、证据和引用支持。先把当前章节写稳，再决定是否进入全文页。
+            左边切章节，中间写正文，右边看证据和质量。先把当前章节写稳，再进入全文整合。
           </p>
         </div>
         <aside className="writing-command-deck__rail">
           <div className="editorial-note-card editorial-note-card--accent">
-            <span className="eyebrow">进入全文前</span>
+            <span className="eyebrow">当前建议</span>
             <strong>先把单章写到可确认状态</strong>
-            <p>等每一章都补齐内容、检查质量、确认材料后，再进入全文整合，整体质量会更稳定。</p>
+            <p>每章先补齐内容、检查质量、确认材料，再进入全文整合。</p>
           </div>
         </aside>
       </section>

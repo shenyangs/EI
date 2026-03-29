@@ -13,12 +13,12 @@ export default async function ReferencesPage({ params }: { params: Promise<{ pro
 
   return (
     <div className="workbench-stack references-page references-page--stitch">
-      <section className="decision-stage-hero">
+      <section className="decision-stage-hero compact-stage-hero">
         <div className="decision-stage-hero__main">
           <span className="eyebrow">Evidence & References</span>
-          <h2>把文献、图表和章节需求真正对齐，不让证据管理变成附件仓库。</h2>
+          <h2>把文献、图表和章节需求真正对齐。</h2>
           <p>
-            这一页负责管理引用、图文材料和格式约束。它的目标不是“堆材料”，而是让你看清楚哪些章节还缺支持证据。
+            这一页不只是堆材料，而是帮助你判断哪些章节还缺支持证据。
           </p>
         </div>
         <aside className="decision-stage-hero__rail">

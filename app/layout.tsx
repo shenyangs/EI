@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { Suspense } from "react";
 
 import { ConnectionLights } from "@/components/connection-lights";
+import { StitchShellNav } from "@/components/stitch-shell-nav";
 import { AuthNav } from "@/components/auth-nav";
 import SimpleDevTools from "@/components/dev/SimpleDevTools";
 import { fallbackStyles } from "@/lib/fallback-styles";
@@ -23,23 +24,25 @@ export default function RootLayout({
         <style id="fallback-styles">{fallbackStyles}</style>
         <div className="ambient ambient--one" />
         <div className="ambient ambient--two" />
-        <div className="site-shell">
-          <header className="site-header">
-            <div className="site-header__copy">
-              <Link className="brand" href="/">
-                Atelier EI
-              </Link>
-              <p className="brand-subtitle">跨学科时尚与设计 EI 论文工作台</p>
-            </div>
-            <div className="site-header__panel">
-              <AuthNav />
-              <ConnectionLights
-                initialModelConnected={false}
-                initialWebSearchConnected={false}
-              />
-            </div>
-          </header>
-          {children}
+        <div className="site-frame">
+          <Suspense fallback={null}>
+            <StitchShellNav />
+          </Suspense>
+          <div className="site-stage">
+            <header className="site-topbar">
+              <div className="site-topbar__search">
+                <span>搜索项目代号、会议或章节...</span>
+              </div>
+              <div className="site-topbar__panel">
+                <ConnectionLights
+                  initialModelConnected={false}
+                  initialWebSearchConnected={false}
+                />
+                <AuthNav />
+              </div>
+            </header>
+            <div className="site-shell">{children}</div>
+          </div>
         </div>
         
         {/* 一键超管工具 */}
